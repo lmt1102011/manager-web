@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Đăng nhập</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background: #f4f6f8; min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+    .card {
+      width: 100%; max-width: 440px; background: white; padding: 24px; border-radius: 14px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.06); border: 1px solid #eef2f7;
+    }
+    h1 { font-size: 22px; color: #1f66cc; margin-bottom: 14px; }
+    p { color: #555; margin-bottom: 16px; }
+    label { display: block; font-weight: 600; color: #333; margin: 10px 0 8px; }
+    input[type="text"], input[type="password"] {
+      width: 100%; padding: 10px 12px; border: 1px solid #d9e2ec; border-radius: 10px; font-size: 15px;
+      outline: none; transition: border 0.2s;
+    }
+    input[type="text"]:focus, input[type="password"]:focus { border-color: #1f66cc; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; }
+    .row label.inline { display: flex; align-items: center; gap: 8px; font-weight: 500; color: #333; }
+    button {
+      width: 100%; margin-top: 14px; padding: 12px 16px; background: #1f66cc; border: none; border-radius: 10px;
+      color: white; font-weight: 700; cursor: pointer; transition: background 0.25s;
+    }
+    button:hover { background: #1554a8; }
+    .hint, .footer { font-size: 13px; color: #6b7280; margin-top: 8px; text-align: center; }
+    .error { color: #e74c3c; font-weight: 600; margin-top: 10px; }
+    .success { color: #1f8b24; font-weight: 600; margin-top: 10px; }
+    a { color: #1f66cc; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Đăng nhập</h1>
+    <p>Nhập tên người dùng và mật khẩu để vào hệ thống.</p>
+
+    <label for="username">Tên người dùng</label>
+    <input type="text" id="username" placeholder="Ví dụ: alice" autocomplete="username" />
+
+    <label for="password">Mật khẩu</label>
+    <input type="password" id="password" placeholder="Mật khẩu" autocomplete="current-password" />
+
+    <div class="row">
+      <label class="inline">
+        <input type="checkbox" id="rememberMe" checked />
+        Ghi nhớ đăng nhập
+      </label>
+      <div><a href="register.html">Chưa có tài khoản? Đăng ký</a></div>
+    </div>
+
+    <button id="loginBtn">đăng nhập</button>
+    <div id="msg" class=""></div>
+    <div class="footer"></div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-database-compat.js"></script>
+
+  <script>
+    // ===== Firebase config (ĐIỀN THÔNG TIN THẬT) =====
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "manager-web-f6b3a.firebaseapp.com",
+      databaseURL: "https://manager-web-f6b3a-default-rtdb.firebaseio.com",
+      projectId: "manager-web-f6b3a",
+      storageBucket: "manager-web-f6b3a.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // ===== Session helpers =====
+    const SESSION_KEY = "app_session";
+    function setSession(username, days) {
+      const expiresAt = Date.now() + (days * 24 * 60 * 60 * 1000);
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ username, expiresAt }));
+    }
+    function getSession() { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; } }
+
+    // Nếu đã có phiên hợp lệ thì vào dashboard / file manager
+    (function checkExistingSession() {
+      const s = getSession();
+      if (s && s.username && Date.now() < s.expiresAt) {
+        if (s.username === "lmt11") location.href = "manager.html";
+        else location.href = "dashboard.html";
+      }
+    })();
+
+    // ===== Crypto helpers (PBKDF2) =====
+    const iterations = 150000;
+    const encoder = new TextEncoder();
+    function toBase64(buf) { const bytes = new Uint8Array(buf); let bin=""; for (let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]); return btoa(bin); }
+    function fromBase64(b64) { const bin=atob(b64); const bytes=new Uint8Array(bin.length); for (let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); return bytes.buffer; }
+    async function pbkdf2Hash(password, saltB64, iters = iterations) {
+      const keyMaterial = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
+      const bits = await crypto.subtle.deriveBits({ name:"PBKDF2", hash:"SHA-256", salt:fromBase64(saltB64), iterations: iters }, keyMaterial, 256);
+      return toBase64(bits);
+    }
+
+    // ===== UI logic =====
+    const loginBtn = document.getElementById("loginBtn");
+    const usernameEl = document.getElementById("username");
+    const passwordEl = document.getElementById("password");
+    const rememberMeEl = document.getElementById("rememberMe");
+    const msgEl = document.getElementById("msg");
+
+    loginBtn.addEventListener("click", async () => {
+      msgEl.textContent = ""; msgEl.className = "";
+      const username = (usernameEl.value || "").trim();
+      const password = passwordEl.value || "";
+      if (!username || !password) { msgEl.textContent = "Vui lòng nhập đủ tên người dùng và mật khẩu."; msgEl.className = "error"; return; }
+
+      try {
+        const snap = await db.ref("users/" + username).once("value");
+        if (!snap.exists()) { msgEl.innerHTML = 'Tài khoản không tồn tại. <a href="register.html">Đăng ký ngay</a>.'; msgEl.className = "error"; return; }
+        const data = snap.val() || {};
+        if (!data.auth || !data.auth.salt || !data.auth.hash || !data.auth.iterations) {
+          msgEl.textContent = "Tài khoản chưa đặt mật khẩu. Hãy liên hệ quản trị viên để đặt mật khẩu."; msgEl.className = "error"; return;
+        }
+        const computed = await pbkdf2Hash(password, data.auth.salt, data.auth.iterations);
+        if (computed !== data.auth.hash) { msgEl.textContent = "Mật khẩu không đúng."; msgEl.className = "error"; return; }
+
+        const days = rememberMeEl.checked ? 7 : 1;
+        setSession(username, days);
+
+        msgEl.textContent = "Đăng nhập thành công. Đang chuyển...";
+        msgEl.className = "success";
+        setTimeout(() => {
+          if (username === "lmt11") location.href = "manager.html";
+          else location.href = "dashboard.html";
+        }, 250);
+      } catch (err) {
+        console.error(err);
+        msgEl.textContent = "Không thể đăng nhập. Vui lòng thử lại.";
+        msgEl.className = "error";
+      }
+    });
+  </script>
+</body>
+</html>

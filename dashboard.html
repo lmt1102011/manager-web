@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background: #f4f6f8; padding: 20px; }
+    header {
+      background: #1f66cc; color: white; padding: 20px; border-radius: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .user-info { font-size: 16px; line-height: 1.5; }
+    .logout {
+      background: white; color: #1f66cc; padding: 8px 16px; border-radius: 8px;
+      text-decoration: none; font-weight: 600; transition: background 0.3s;
+    }
+    .logout:hover { background: #e0e7ff; }
+    main.dashboard {
+      margin-top: 25px; background: white; padding: 30px; border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+    }
+    h2 { font-size: 22px; margin-bottom: 10px; color: #333; }
+    h3 { font-size: 18px; margin: 18px 0 10px; color: #333; }
+    p { font-size: 16px; color: #555; }
+    .totals {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0 10px;
+    }
+    .total-box {
+      background: #f7fbff; border: 1px solid #e4efff; border-radius: 10px; padding: 12px 14px;
+      color: #1f66cc; font-weight: 600;
+    }
+    .game {
+      margin-top: 18px; padding: 16px; border: 1px solid #eef2f7; border-radius: 12px; background: #fafcff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+    }
+    .options {
+      display: flex; align-items: center; gap: 10px; background: #eaf4ff;
+      padding: 12px 16px; border-radius: 10px; margin-top: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+    }
+    .options p { font-weight: 600; color: #1f66cc; }
+    .options input[type="number"],
+    .options input[type="text"] {
+      width: 180px; padding: 8px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;
+    }
+    .options button {
+      padding: 8px 14px; background: #0078d4; border: none; border-radius: 8px; color: white;
+      font-weight: 600; cursor: pointer; transition: background 0.3s;
+    }
+    .options button:hover { background: #005fa3; }
+    #marketStatusNotice { margin-top: 12px; font-weight: bold; color: #e74c3c; }
+    .result { margin-top: 10px; font-weight: 600; }
+    .result.win { color: #1f8b24; }
+    .result.lose { color: #e74c3c; }
+
+    /* Canvas Candlestick */
+    .candle-wrapper { margin-top: 14px; }
+    #candleCanvas { width: 100%; height: 260px; background: #fff; border: 1px solid #e0e6ee; border-radius: 8px; display: block; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="user-info">
+      Xin chào, <strong id="username">...</strong><br/>
+      Số dư: <strong id="balance">0₫</strong>
+    </div>
+    <a class="logout" href="index.html" id="logoutBtn">Đăng xuất</a>
+  </header>
+
+  <main class="dashboard">
+    <h2>Quản lý số dư</h2>
+    <p>Chào mừng bạn đến với dashboard. Hệ thống đã sẵn sàng để bạn thao tác.</p>
+
+    <div class="totals">
+      <div class="total-box">Tổng đã đặt — Coin: <span id="submitAmountCoin">0</span>₫</div>
+      <div class="total-box">Tổng đã đặt — Chứng khoán: <span id="submitAmountStock">0</span>₫</div>
+    </div>
+
+    <!-- Game: Coin -->
+    <div class="game" id="game-coin">
+      <h3>Coin</h3>
+      <div class="options">
+        <p>Coin:</p>
+        <input type="number" id="amountCoin" placeholder="Số tiền" />
+        <button id="addFunds">Submit</button>
+      </div>
+    </div>
+
+    <!-- Game: Chứng khoán -->
+    <div class="game" id="game-stock">
+      <h3>Chứng khoán</h3>
+      <div class="options">
+        <p>Đặt:</p>
+        <input type="number" id="amountStock" placeholder="Số tiền" />
+        <button id="placeStockBet">Đặt cược</button>
+      </div>
+
+      <!-- Candlestick chart (canvas tự vẽ) -->
+      <div class="candle-wrapper">
+        <canvas id="candleCanvas" width="800" height="260"></canvas>
+      </div>
+      <div id="stockResult" class="result"></div>
+    </div>
+
+    <!-- Chuyển khoản -->
+    <div class="game" id="game-transfer">
+      <h3>Chuyển khoản</h3>
+      <div class="options" style="flex-wrap: wrap;">
+        <p>Đến:</p>
+        <input type="text" id="transferTo" placeholder="Tên người nhận (username)" />
+        <p>Số tiền:</p>
+        <input type="number" id="transferAmount" placeholder="Số tiền" />
+        <input type="text" id="transferNote" placeholder="Ghi chú (tuỳ chọn)" style="flex:1; min-width: 240px;" />
+        <button id="transferBtn">Chuyển</button>
+      </div>
+      <div id="transferStatus" class="result" style="margin-top: 8px;"></div>
+      <small style="display:block;margin-top:6px;color:#777;">* Chuyển khoản không phụ thuộc trạng thái sàn.</small>
+    </div>
+
+    <!-- Lịch sử chuyển khoản -->
+    <div class="game" id="transfer-history">
+      <h3>Lịch sử chuyển khoản (gần đây)</h3>
+      <ul id="transferList" style="margin-top:8px; padding-left:16px; color:#444;"></ul>
+    </div>
+
+    <p id="marketStatusNotice"></p>
+  </main>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-database-compat.js"></script>
+
+  <script>
+  // =========================
+  // Firebase config (ĐIỀN THÔNG TIN THẬT CỦA BẠN)
+  // =========================
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "manager-web-f6b3a.firebaseapp.com",
+    databaseURL: "https://manager-web-f6b3a-default-rtdb.firebaseio.com",
+    projectId: "manager-web-f6b3a",
+    storageBucket: "manager-web-f6b3a.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  // =========================
+  // Session helpers
+  // =========================
+  const SESSION_KEY = "app_session";
+  const SESSION_LIFETIME_DAYS = 7;
+
+  function getSession() {
+    try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; }
+  }
+  function saveSession(username, days = SESSION_LIFETIME_DAYS) {
+    const expiresAt = Date.now() + days * 24 * 60 * 60 * 1000;
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ username, expiresAt }));
+  }
+  function clearSession() { localStorage.removeItem(SESSION_KEY); }
+
+  // ===== Auth (local) with persistent session =====
+  const session = getSession();
+  if (!session || !session.username || Date.now() > session.expiresAt) {
+    clearSession();
+    location.href = "index.html";
+  }
+  const currentUser = session.username;
+
+  // Sliding expiration (gia hạn mỗi lần vào dashboard)
+  (function touchSession() { saveSession(currentUser, SESSION_LIFETIME_DAYS); })();
+
+  // ===== Logout =====
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      clearSession();
+      location.href = "index.html";
+    });
+  }
+
+  // =========================
+  // Helpers & UI bindings
+  // =========================
+  function formatMoney(n) {
+    return Number(n || 0).toLocaleString() + "₫";
+  }
+
+  // ===== Market status =====
+  let isMarketOpen = true;
+  db.ref("market/status").on("value", snap => {
+    const status = snap.val();
+    isMarketOpen = (status === "open");
+    const notice = document.getElementById("marketStatusNotice");
+    if (notice) notice.textContent = isMarketOpen ? "" : "Sàn hiện đang đóng.";
+  });
+
+  // ===== User info =====
+  function updateUserInfo(snapshot) {
+    const doc = snapshot.val();
+    if (!doc) {
+      alert("Không tìm thấy thông tin người dùng.");
+      clearSession();
+      location.href = "index.html";
+      return;
+    }
+    const u = document.getElementById("username");
+    const b = document.getElementById("balance");
+    if (u) u.textContent = doc.username || "(không có tên)";
+    if (b) b.textContent = formatMoney(doc.balance || 0);
+  }
+
+  // ===== Totals renderers =====
+  function renderTotalSubmitCoin() {
+    const target = document.getElementById("submitAmountCoin");
+    if (!target) return;
+    db.ref("logs").once("value", snapshot => {
+      let total = 0;
+      snapshot.forEach(child => { total += child.val()?.amount || 0; });
+      target.textContent = total.toLocaleString();
+    });
+  }
+  function renderTotalSubmitStock() {
+    const target = document.getElementById("submitAmountStock");
+    if (!target) return;
+    db.ref("logs_stock").once("value", snapshot => {
+      let total = 0;
+      snapshot.forEach(child => { total += child.val()?.amount || 0; });
+      target.textContent = total.toLocaleString();
+    });
+  }
+
+  // ===== Initial load =====
+  db.ref("users/" + currentUser).once("value")
+    .then(updateUserInfo)
+    .then(() => { renderTotalSubmitCoin(); renderTotalSubmitStock(); })
+    .catch(() => {
+      alert("Tài khoản không hợp lệ.");
+      clearSession();
+      location.href = "index.html";
+    });
+
+  // Live updates
+  db.ref("users/" + currentUser).on("value", updateUserInfo);
+  db.ref("logs").on("value", renderTotalSubmitCoin);
+  db.ref("logs_stock").on("value", renderTotalSubmitStock);
+
+  // =========================
+  // Coin
+  // =========================
+  const addFundsBtn = document.getElementById("addFunds");
+  if (addFundsBtn) {
+    addFundsBtn.addEventListener("click", async () => {
+      if (!isMarketOpen) { alert("Sàn đang đóng."); return; }
+      const amount = parseInt(document.getElementById("amountCoin").value);
+      if (isNaN(amount) || amount <= 0) { alert("Vui lòng nhập số tiền hợp lệ."); return; }
+
+      try {
+        const userRef = db.ref("users/" + currentUser);
+        await userRef.child("balance").transaction(currentBalance => {
+          const balance = currentBalance || 0;
+          if (balance < amount) return; // abort
+          return balance - amount;
+        }, async (error, committed) => {
+          if (error) {
+            console.error(error); alert("Có lỗi xảy ra.");
+          } else if (!committed) {
+            alert("Không đủ số dư.");
+          } else {
+            const newLogRef = db.ref("logs").push();
+            await newLogRef.set({
+              type: "coin",
+              username: currentUser,
+              amount: amount,
+              timestamp: new Date().toISOString(),
+              serverTimestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+            const input = document.getElementById("amountCoin");
+            if (input) input.value = "";
+            renderTotalSubmitCoin();
+          }
+        });
+      } catch (err) {
+        console.error(err);
+        alert("Có lỗi xảy ra.");
+      }
+    });
+  }
+
+  // =========================
+  // Candlestick (Canvas) – Autoscale & Volatility
+  // =========================
+  const canvas = document.getElementById('candleCanvas');
+  const ctx = canvas ? canvas.getContext('2d') : null;
+
+  function fitCanvasToDisplay() {
+    if (!canvas) return;
+    const w = canvas.clientWidth || 800;
+    const h = canvas.clientHeight || 260;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+  }
+
+  let candlesBuffer = []; // bộ đệm nến đang hiển thị
+
+  function clearCanvasBG() {
+    if (!ctx || !canvas) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grid ngang
+    ctx.strokeStyle = "#eef2f7";
+    ctx.lineWidth = 1;
+    for (let y = 0; y <= canvas.height; y += 40) {
+      ctx.beginPath();
+      ctx.moveTo(0, y + 0.5);
+      ctx.lineTo(canvas.width, y + 0.5);
+      ctx.stroke();
+    }
+  }
+
+  function generateRandomCandle(prevClose, vol = 3.0, drift = 0.15) {
+    const open = prevClose + (Math.random() - 0.5) * vol;
+    const swing = vol * (0.8 + Math.random());
+    const close = open + (Math.random() - 0.5) * (swing + drift);
+    const wickExtra = vol * (0.6 + Math.random());
+    const high = Math.max(open, close) + Math.random() * wickExtra;
+    const low  = Math.min(open, close) - Math.random() * wickExtra;
+    return { open, close, high: Math.max(high, open, close), low: Math.min(low, open, close) };
+  }
+
+  function drawCandlePixel(x, cw, openY, closeY, highY, lowY) {
+    if (!ctx) return;
+    const up = closeY <= openY;
+    const color = up ? '#1f8b24' : '#e74c3c';
+
+    // Wick
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(x + cw / 2, highY);
+    ctx.lineTo(x + cw / 2, lowY);
+    ctx.stroke();
+
+    // Body
+    const top = Math.min(openY, closeY);
+    const bottom = Math.max(openY, closeY);
+    const bodyH = Math.max(2, bottom - top);
+    ctx.fillStyle = color;
+    ctx.fillRect(x, top, cw, bodyH);
+  }
+
+  function redrawAll() {
+    if (!canvas) return;
+    clearCanvasBG();
+    if (!candlesBuffer.length) return;
+
+    // Autoscale theo min/max
+    let minP = Infinity, maxP = -Infinity;
+    for (const c of candlesBuffer) {
+      if (c.low < minP) minP = c.low;
+      if (c.high > maxP) maxP = c.high;
+    }
+    if (!Number.isFinite(minP) || !Number.isFinite(maxP) || minP === maxP) {
+      minP = minP || 0; maxP = maxP || 1;
+    }
+
+    const paddingTop = 10, paddingBottom = 10;
+    const usableH = canvas.height - paddingTop - paddingBottom;
+    const toY = (price) => {
+      const t = (price - minP) / (maxP - minP);
+      return paddingTop + (1 - t) * usableH;
+    };
+
+    // Kích thước nến theo bề rộng canvas và số nến
+    const gap = 4;
+    const cw = Math.max(6, Math.min(18, (canvas.width - 20) / candlesBuffer.length - gap));
+    const stepX = cw + gap;
+
+    let x = 10;
+    for (const c of candlesBuffer) {
+      drawCandlePixel(x, cw, toY(c.open), toY(c.close), toY(c.high), toY(c.low));
+      x += stepX;
+      if (x > canvas.width - (cw + 10)) break;
+    }
+  }
+
+  function playCandles(durationMs = 3000, startFrom = 100, ticks = 35, vol = 3.8) {
+    return new Promise(resolve => {
+      if (!canvas) { resolve({ finalIndex: 50, lastClose: startFrom, startPrice: startFrom }); return; }
+
+      // Chuẩn bị canvas
+      fitCanvasToDisplay();
+      candlesBuffer = [];
+
+      // Seed trước vài nến để có khung
+      let prevClose = startFrom;
+      for (let i = 0; i < 10; i++) {
+        const c = generateRandomCandle(prevClose, vol * 0.8);
+        candlesBuffer.push(c);
+        prevClose = c.close;
+      }
+      redrawAll();
+
+      const interval = Math.max(60, Math.floor(durationMs / ticks));
+      let tick = 0;
+
+      const timer = setInterval(() => {
+        tick++;
+        const c = generateRandomCandle(prevClose, vol);
+        candlesBuffer.push(c);
+        prevClose = c.close;
+
+        // Nếu quá nhiều nến so với bề rộng thì cuộn bớt
+        const maxCandles = Math.floor((canvas.width - 20) / 10);
+        if (candlesBuffer.length > Math.max(30, maxCandles)) {
+          candlesBuffer.shift();
+        }
+
+        redrawAll();
+
+        if (tick >= ticks) {
+          clearInterval(timer);
+          const finalIndex = Math.max(0, Math.min(100,
+            Math.round((prevClose / startFrom) * 50 + (Math.random() * 10 - 5))
+          ));
+          resolve({ finalIndex, lastClose: prevClose, startPrice: startFrom });
+        }
+      }, interval);
+    });
+  }
+
+  // Responsive: khi canvas đổi kích thước
+  if (canvas) {
+    fitCanvasToDisplay();
+    clearCanvasBG();
+    new ResizeObserver(() => { fitCanvasToDisplay(); redrawAll(); }).observe(canvas);
+  }
+
+  // =========================
+  // Stock Game (đặt cược)
+  // =========================
+  const stockResult = document.getElementById("stockResult");
+  const placeStockBetBtn = document.getElementById("placeStockBet");
+  let stockWinRate = 50;
+
+  // Realtime win rate
+  const winRateRef = db.ref("config/stock/winRate");
+  winRateRef.on("value", snap => {
+    const val = Number(snap.val());
+    stockWinRate = Number.isFinite(val) ? Math.max(0, Math.min(100, Math.round(val))) : 50;
+  });
+
+  if (placeStockBetBtn) {
+    placeStockBetBtn.addEventListener("click", async () => {
+      if (!isMarketOpen) { alert("Sàn đang đóng."); return; }
+
+      const amountEl = document.getElementById("amountStock");
+      const amount = parseInt(amountEl.value);
+      if (isNaN(amount) || amount <= 0) { alert("Vui lòng nhập số tiền hợp lệ."); return; }
+
+      placeStockBetBtn.disabled = true;
+      if (stockResult) { stockResult.textContent = ""; stockResult.className = "result"; }
+
+      try {
+        const userRef = db.ref("users/" + currentUser);
+
+        // Trừ tiền
+        const deducted = await new Promise((resolve, reject) => {
+          userRef.child("balance").transaction(currentBalance => {
+            const balance = currentBalance || 0;
+            if (balance < amount) return; // abort
+            return balance - amount;
+          }, (error, committed) => {
+            if (error) reject(error);
+            else if (!committed) resolve(false);
+            else resolve(true);
+          });
+        });
+
+        if (!deducted) { alert("Không đủ số dư."); return; }
+
+        // Chạy biểu đồ nến tự vẽ (tăng vol/ticks để nến “dài” hơn nếu muốn)
+        const startFrom = 100 + Math.random() * 10;
+        const { finalIndex } = await playCandles(5000, startFrom, 45, 5.0);
+
+        // Quyết định thắng/thua theo tỷ lệ từ DB
+        const roll = Math.random() * 100;
+        const isWin = roll < stockWinRate;
+
+        if (isWin) {
+          await userRef.child("balance").transaction(balance => (balance || 0) + (amount * 2));
+          if (stockResult) {
+            stockResult.textContent = `Thắng! ${ (amount * 2).toLocaleString() }₫`;
+            stockResult.classList.add("win");
+          }
+        } else {
+          if (stockResult) {
+            stockResult.textContent = `Thua! -${ amount.toLocaleString() }₫`;
+            stockResult.classList.add("lose");
+          }
+        }
+
+        // Ghi log chứng khoán
+        const newLogRef = db.ref("logs_stock").push();
+        await newLogRef.set({
+          type: "stock",
+          username: currentUser,
+          amount: amount,
+          winRate: stockWinRate,
+          finalBar: finalIndex, // giữ tương thích 0..100
+          result: isWin ? "win" : "lose",
+          timestamp: new Date().toISOString(),
+          serverTimestamp: firebase.database.ServerValue.TIMESTAMP
+        });
+
+        if (amountEl) amountEl.value = "";
+        renderTotalSubmitStock();
+      } catch (err) {
+        console.error(err);
+        alert("Có lỗi xảy ra.");
+      } finally {
+        placeStockBetBtn.disabled = false;
+      }
+    });
+  }
+
+  // =========================
+  // Transfer
+  // =========================
+  const transferToEl = document.getElementById("transferTo");
+  const transferAmountEl = document.getElementById("transferAmount");
+  const transferNoteEl = document.getElementById("transferNote");
+  const transferBtn = document.getElementById("transferBtn");
+  const transferStatus = document.getElementById("transferStatus");
+
+  async function transferFunds() {
+    if (!transferStatus) return;
+    transferStatus.textContent = "";
+    transferStatus.className = "result";
+    const toUserRaw = (transferToEl?.value || "").trim();
+    const amount = parseInt(transferAmountEl?.value, 10);
+    const note = (transferNoteEl?.value || "").trim();
+
+    if (!toUserRaw) { alert("Vui lòng nhập tên người nhận."); return; }
+    if (toUserRaw === currentUser) { alert("Không thể chuyển cho chính bạn."); return; }
+    if (isNaN(amount) || amount <= 0) { alert("Vui lòng nhập số tiền hợp lệ."); return; }
+
+    if (transferBtn) transferBtn.disabled = true;
+
+    try {
+      const senderRef = db.ref("users/" + currentUser);
+      const recipientRef = db.ref("users/" + toUserRaw);
+
+      const recipientSnap = await recipientRef.once("value");
+      if (!recipientSnap.exists()) { alert("Không tìm thấy người nhận: " + toUserRaw); return; }
+
+      const deducted = await new Promise((resolve, reject) => {
+        senderRef.child("balance").transaction(currentBalance => {
+          const balance = currentBalance || 0;
+          if (balance < amount) return;
+          return balance - amount;
+        }, (error, committed) => {
+          if (error) reject(error);
+          else if (!committed) resolve(false);
+          else resolve(true);
+        });
+      });
+
+      if (!deducted) { alert("Không đủ số dư để chuyển."); return; }
+
+      const credited = await new Promise((resolve, reject) => {
+        recipientRef.child("balance").transaction(currentBalance => {
+          const balance = currentBalance || 0;
+          return balance + amount;
+        }, (error, committed) => {
+          if (error) reject(error);
+          else if (!committed) resolve(false);
+          else resolve(true);
+        });
+      });
+
+      if (!credited) {
+        await senderRef.child("balance").transaction(b => (b || 0) + amount);
+        alert("Chuyển khoản thất bại. Đã hoàn lại số dư.");
+        return;
+      }
+
+      const transferLogRef = db.ref("transfers").push();
+      await transferLogRef.set({
+        from: currentUser,
+        to: toUserRaw,
+        amount: amount,
+        note: note || null,
+        timestamp: new Date().toISOString(),
+        serverTimestamp: firebase.database.ServerValue.TIMESTAMP,
+        status: "success"
+      });
+
+      if (transferAmountEl) transferAmountEl.value = "";
+      transferStatus.textContent = `Đã chuyển ${formatMoney(amount)} tới ${toUserRaw}.`;
+      transferStatus.classList.add("win");
+
+    } catch (err) {
+      console.error(err);
+      try {
+        const transferLogRef = db.ref("transfers").push();
+        await transferLogRef.set({
+          from: currentUser,
+          to: (transferToEl?.value || "").trim(),
+          amount: parseInt(transferAmountEl?.value, 10) || 0,
+          note: (transferNoteEl?.value || "").trim() || null,
+          timestamp: new Date().toISOString(),
+          serverTimestamp: firebase.database.ServerValue.TIMESTAMP,
+          status: "error",
+          errorMessage: String(err)
+        });
+      } catch (_) {}
+      alert("Có lỗi xảy ra khi chuyển khoản.");
+    } finally {
+      if (transferBtn) transferBtn.disabled = false;
+    }
+  }
+
+  if (transferBtn) transferBtn.addEventListener("click", transferFunds);
+
+  // Lịch sử chuyển khoản (gần đây)
+  const transferListEl = document.getElementById("transferList");
+  if (transferListEl) {
+    db.ref("transfers").limitToLast(50).on("value", snap => {
+      const items = [];
+      snap.forEach(child => {
+        const t = child.val() || {};
+        if (t.from === currentUser || t.to === currentUser) {
+          const dir = t.from === currentUser ? "➡️" : "⬅️";
+          const counterparty = t.from === currentUser ? t.to : t.from;
+          const sign = t.from === currentUser ? "-" : "+";
+          items.push(
+            `<li>${dir} ${counterparty} — ${sign}${formatMoney(t.amount)} <small style="color:#777;">(${new Date(t.timestamp).toLocaleString()})</small></li>`
+          );
+        }
+      });
+      items.reverse();
+      transferListEl.innerHTML = items.join("");
+    });
+  }
+
+  // Live update user (đã có ở trên)
+  db.ref("users/" + currentUser).on("value", updateUserInfo);
+</script>
+
+</body>
+</html>
