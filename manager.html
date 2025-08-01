@@ -265,11 +265,12 @@ db.ref("market_stock/status").on("value", snap => {
   try {
     const snap = await db.ref("logs").once("value");
     const rows = [];
-    snap.forEach(child => rows.push({ key: child.key, ...child.val() }));
-    rows.sort((a, b) => {
-      const ta = a.serverTimestamp ?? (a.timestamp ? new Date(a.timestamp).getTime() : -Infinity);
-      const tb = b.serverTimestamp ?? (b.timestamp ? new Date(b.timestamp).getTime() : -Infinity);
-      return tb - ta;
+
+    snap.forEach(child => {
+      const data = child.val();
+      if (data && data.username && data.amount) {
+        rows.push({ key: child.key, ...data });
+      }
     });
 
     let totalAmount = 0;
