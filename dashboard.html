@@ -105,6 +105,23 @@
       </div>
       <div id="stockResult" class="result"></div>
     </div>
+    
+    <div class="game" id="game-bank">
+  <h3>Ngân hàng</h3>
+  <div class="options" style="flex-wrap: wrap;">
+    <p>Số tiền gửi:</p>
+    <input type="number" id="bankDeposit" placeholder="Số tiền gửi" />
+    <button id="depositBankBtn">Gửi vào ngân hàng</button>
+  </div>
+  <div class="options" style="flex-wrap: wrap;">
+    <p>Số tiền rút:</p>
+    <input type="number" id="bankWithdraw" placeholder="Số tiền rút" />
+    <button id="withdrawBankBtn">Rút từ ngân hàng</button>
+  </div>
+  <p style="margin-top: 10px;">Tiền trong ngân hàng: <strong id="bankBalance">0₫</strong></p>
+  <p style="font-size: 14px; color: #888;">* Ngân hàng tự động cộng lãi 1% mỗi phút.</p>
+</div>
+
 
     <!-- Chuyển khoản -->
     <div class="game" id="game-transfer">
@@ -527,6 +544,212 @@
       }
     });
   }
+  // =========================
+// Chuyển khoản
+// =========================
+const transferBtn = document.getElementById("transferBtn");
+if (transferBtn) {
+  transferBtn.addEventListener("click", async () => {
+    const toEl = document.getElementById("transferTo");
+    const amountEl = document.getElementById("transferAmount");
+    const noteEl = document.getElementById("transferNote");
+    const statusEl = document.getElementById("transferStatus");
+
+    const toUser = toEl.value.trim();
+    const amount = parseInt(amountEl.value);
+    const note = noteEl.value.trim();
+
+    statusEl.textContent = "";
+    statusEl.className = "result";
+
+    if (!toUser || isNaN(amount) || amount <= 0) {
+      statusEl.textContent = "Vui lòng nhập đúng tên người nhận và số tiền.";
+      return;
+    }
+
+    if (toUser === currentUser) {
+      statusEl.textContent = "Không thể chuyển cho chính mình.";
+      return;
+    }
+
+    try {
+      const [fromSnap, toSnap] = await Promise.all([
+        db.ref("users/" + currentUser).once("value"),
+        db.ref("users/" + toUser).once("value"),
+      ]);
+
+      const fromData = fromSnap.val();
+      const toData = toSnap.val();
+
+      if (!fromData || !toData) {
+        statusEl.textContent = "Người dùng không tồn tại.";
+        return;
+      }
+
+      if ((fromData.balance || 0) < amount) {
+        statusEl.textContent = "Không đủ số dư để chuyển.";
+        return;
+      }
+
+      // Trừ tiền người gửi và cộng tiền người nhận
+      await Promise.all([
+        db.ref("users/" + currentUser + "/balance").set((fromData.balance || 0) - amount),
+        db.ref("users/" + toUser + "/balance").set((toData.balance || 0) + amount),
+        db.ref("transfers").push({
+          from: currentUser,
+          to: toUser,
+          amount,
+          note,
+          timestamp: new Date().toISOString(),
+          serverTimestamp: firebase.database.ServerValue.TIMESTAMP
+        })
+      ]);
+
+      // Clear inputs
+      toEl.value = "";
+      amountEl.value = "";
+      noteEl.value = "";
+
+      statusEl.textContent = `Đã chuyển ${amount.toLocaleString()}₫ cho ${toUser}.`;
+      statusEl.classList.add("win");
+
+      // Gọi lại lịch sử nếu có
+      renderTransferHistory();
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = "Có lỗi xảy ra khi chuyển tiền.";
+      statusEl.classList.add("lose");
+    }
+  });
+}
+
+// Lịch sử chuyển khoản gần đây
+function renderTransferHistory() {
+  const list = document.getElementById("transferList");
+  if (!list) return;
+
+  db.ref("transfers")
+    .orderByChild("serverTimestamp")
+    .limitToLast(20)
+    .once("value", snap => {
+      const items = [];
+      snap.forEach(child => {
+        const tx = child.val();
+        if (tx.from === currentUser || tx.to === currentUser) {
+          const dir = tx.from === currentUser ? "→" : "←";
+          const user = tx.from === currentUser ? tx.to : tx.from;
+          const sign = tx.from === currentUser ? "-" : "+";
+          const item = `<li>${sign}${tx.amount.toLocaleString()}₫ ${dir} ${user}${tx.note ? ` — ${tx.note}` : ""}</li>`;
+          items.unshift(item);
+        }
+      });
+      list.innerHTML = items.join("");
+    });
+}
+
+// Gọi khi vào trang
+renderTransferHistory();
+let isMarketOpenCoin = true;
+let isMarketOpenStock = true;
+
+const statusNotice = document.getElementById("marketStatusNotice");
+
+// Coin status
+const coinStatusRef = db.ref("market_coin/status");
+coinStatusRef.on("value", snap => {
+  const status = snap.val();
+  isMarketOpenCoin = status === "open";
+  updateMarketStatusNotice();
+});
+
+// Stock status
+const stockStatusRef = db.ref("market_stock/status");
+stockStatusRef.on("value", snap => {
+  const status = snap.val();
+  isMarketOpenStock = status === "open";
+  updateMarketStatusNotice();
+});
+
+function updateMarketStatusNotice() {
+  let message = "";
+  if (!isMarketOpenCoin) message += "Sàn Coin hiện đang đóng. ";
+  if (!isMarketOpenStock) message += "Sàn Chứng khoán hiện đang đóng.";
+  if (statusNotice) statusNotice.textContent = message.trim();
+}
+const bankBalanceEl = document.getElementById("bankBalance");
+const bankDepositBtn = document.getElementById("depositBankBtn");
+const bankWithdrawBtn = document.getElementById("withdrawBankBtn");
+
+async function updateBankInterest() {
+  const userRef = db.ref("users/" + currentUser + "/bank");
+  const snap = await userRef.once("value");
+  const bank = snap.val() || {};
+  const now = Date.now();
+  const lastTime = bank.lastInterestTime || now;
+  const balance = bank.balance || 0;
+  const minutes = Math.floor((now - lastTime) / 60000);
+  const interestRatePerMinute = 0.01; // 1%
+
+  if (minutes > 0) {
+    const newBalance = Math.floor(balance * Math.pow(1 + interestRatePerMinute, minutes));
+    await userRef.update({
+      balance: newBalance,
+      lastInterestTime: now
+    });
+  }
+}
+
+function loadBankBalance() {
+  db.ref("users/" + currentUser + "/bank/balance").on("value", snap => {
+    const val = snap.val() || 0;
+    if (bankBalanceEl) bankBalanceEl.textContent = formatMoney(val);
+  });
+}
+
+bankDepositBtn?.addEventListener("click", async () => {
+  const amount = parseInt(document.getElementById("bankDeposit").value);
+  if (isNaN(amount) || amount <= 0) return alert("Số tiền không hợp lệ.");
+
+  const userRef = db.ref("users/" + currentUser);
+  const snap = await userRef.once("value");
+  const user = snap.val();
+  if (!user || user.balance < amount) return alert("Không đủ số dư.");
+
+  await updateBankInterest();
+
+  await Promise.all([
+    userRef.child("balance").set(user.balance - amount),
+    userRef.child("bank/balance").set((user.bank?.balance || 0) + amount),
+    userRef.child("bank/lastInterestTime").set(Date.now())
+  ]);
+
+  alert("Đã gửi vào ngân hàng.");
+});
+
+bankWithdrawBtn?.addEventListener("click", async () => {
+  const amount = parseInt(document.getElementById("bankWithdraw").value);
+  if (isNaN(amount) || amount <= 0) return alert("Số tiền không hợp lệ.");
+
+  const userRef = db.ref("users/" + currentUser);
+  await updateBankInterest();
+
+  const snap = await userRef.once("value");
+  const user = snap.val();
+  const bankBalance = user.bank?.balance || 0;
+
+  if (amount > bankBalance) return alert("Không đủ tiền trong ngân hàng.");
+
+  await Promise.all([
+    userRef.child("balance").set(user.balance + amount),
+    userRef.child("bank/balance").set(bankBalance - amount),
+    userRef.child("bank/lastInterestTime").set(Date.now())
+  ]);
+
+  alert("Đã rút tiền từ ngân hàng.");
+});
+
+loadBankBalance();
+
 </script>
 
 </body>
