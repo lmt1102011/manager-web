@@ -311,7 +311,7 @@
     }
   }
 
-  let candlesBuffer = []; // bộ đệm nến đang hiển thị
+  let candlesBuffer = [];
 
   function clearCanvasBG() {
     if (!ctx || !canvas) return;
@@ -319,7 +319,6 @@
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Grid ngang
     ctx.strokeStyle = "#eef2f7";
     ctx.lineWidth = 1;
     for (let y = 0; y <= canvas.height; y += 40) {
@@ -336,7 +335,7 @@
     const close = open + (Math.random() - 0.5) * (swing + drift);
     const wickExtra = vol * (0.6 + Math.random());
     const high = Math.max(open, close) + Math.random() * wickExtra;
-    const low  = Math.min(open, close) - Math.random() * wickExtra;
+    const low = Math.min(open, close) - Math.random() * wickExtra;
     return { open, close, high: Math.max(high, open, close), low: Math.min(low, open, close) };
   }
 
@@ -345,14 +344,12 @@
     const up = closeY <= openY;
     const color = up ? '#1f8b24' : '#e74c3c';
 
-    // Wick
     ctx.strokeStyle = color;
     ctx.beginPath();
     ctx.moveTo(x + cw / 2, highY);
     ctx.lineTo(x + cw / 2, lowY);
     ctx.stroke();
 
-    // Body
     const top = Math.min(openY, closeY);
     const bottom = Math.max(openY, closeY);
     const bodyH = Math.max(2, bottom - top);
@@ -365,7 +362,6 @@
     clearCanvasBG();
     if (!candlesBuffer.length) return;
 
-    // Autoscale theo min/max
     let minP = Infinity, maxP = -Infinity;
     for (const c of candlesBuffer) {
       if (c.low < minP) minP = c.low;
@@ -382,7 +378,6 @@
       return paddingTop + (1 - t) * usableH;
     };
 
-    // Kích thước nến theo bề rộng canvas và số nến
     const gap = 4;
     const cw = Math.max(6, Math.min(18, (canvas.width - 20) / candlesBuffer.length - gap));
     const stepX = cw + gap;
@@ -395,18 +390,21 @@
     }
   }
 
-  function playCandles(durationMs = 3000, startFrom = 100, ticks = 35, vol = 3.8) {
+  function playCandles(durationMs = 3000, startFrom = 100, ticks = 35, vol = 3.8, isWin = false) {
     return new Promise(resolve => {
-      if (!canvas) { resolve({ finalIndex: 50, lastClose: startFrom, startPrice: startFrom }); return; }
+      if (!canvas) {
+        resolve({ finalIndex: 50, lastClose: startFrom, startPrice: startFrom });
+        return;
+      }
 
-      // Chuẩn bị canvas
       fitCanvasToDisplay();
       candlesBuffer = [];
 
-      // Seed trước vài nến để có khung
       let prevClose = startFrom;
+      const drift = isWin ? 0.8 : -0.8;
+
       for (let i = 0; i < 10; i++) {
-        const c = generateRandomCandle(prevClose, vol * 0.8);
+        const c = generateRandomCandle(prevClose, vol * 0.8, drift);
         candlesBuffer.push(c);
         prevClose = c.close;
       }
@@ -417,11 +415,10 @@
 
       const timer = setInterval(() => {
         tick++;
-        const c = generateRandomCandle(prevClose, vol);
+        const c = generateRandomCandle(prevClose, vol, drift);
         candlesBuffer.push(c);
         prevClose = c.close;
 
-        // Nếu quá nhiều nến so với bề rộng thì cuộn bớt
         const maxCandles = Math.floor((canvas.width - 20) / 10);
         if (candlesBuffer.length > Math.max(30, maxCandles)) {
           candlesBuffer.shift();
@@ -440,7 +437,6 @@
     });
   }
 
-  // Responsive: khi canvas đổi kích thước
   if (canvas) {
     fitCanvasToDisplay();
     clearCanvasBG();
@@ -448,13 +444,12 @@
   }
 
   // =========================
-  // Stock Game (đặt cược)
+  // Stock Game
   // =========================
   const stockResult = document.getElementById("stockResult");
   const placeStockBetBtn = document.getElementById("placeStockBet");
   let stockWinRate = 50;
 
-  // Realtime win rate
   const winRateRef = db.ref("config/stock/winRate");
   winRateRef.on("value", snap => {
     const val = Number(snap.val());
@@ -475,11 +470,10 @@
       try {
         const userRef = db.ref("users/" + currentUser);
 
-        // Trừ tiền
         const deducted = await new Promise((resolve, reject) => {
           userRef.child("balance").transaction(currentBalance => {
             const balance = currentBalance || 0;
-            if (balance < amount) return; // abort
+            if (balance < amount) return;
             return balance - amount;
           }, (error, committed) => {
             if (error) reject(error);
@@ -490,18 +484,18 @@
 
         if (!deducted) { alert("Không đủ số dư."); return; }
 
-        // Chạy biểu đồ nến tự vẽ (tăng vol/ticks để nến “dài” hơn nếu muốn)
         const startFrom = 100 + Math.random() * 10;
-        const { finalIndex } = await playCandles(5000, startFrom, 45, 5.0);
 
-        // Quyết định thắng/thua theo tỷ lệ từ DB
-        const roll = Math.random() * 100;
-        const isWin = roll < stockWinRate;
+        // Dùng winRate để xác định thắng/thua từ đầu
+        const isWin = Math.random() * 100 < stockWinRate;
+
+        // Tạo biểu đồ theo hướng thắng/thua
+        const { finalIndex } = await playCandles(5000, startFrom, 45, 5.0, isWin);
 
         if (isWin) {
           await userRef.child("balance").transaction(balance => (balance || 0) + (amount * 2));
           if (stockResult) {
-            stockResult.textContent = `Thắng! ${ (amount * 2).toLocaleString() }₫`;
+            stockResult.textContent = `Thắng! +${ (amount * 2).toLocaleString() }₫`;
             stockResult.classList.add("win");
           }
         } else {
@@ -511,14 +505,13 @@
           }
         }
 
-        // Ghi log chứng khoán
         const newLogRef = db.ref("logs_stock").push();
         await newLogRef.set({
           type: "stock",
           username: currentUser,
           amount: amount,
           winRate: stockWinRate,
-          finalBar: finalIndex, // giữ tương thích 0..100
+          finalBar: finalIndex,
           result: isWin ? "win" : "lose",
           timestamp: new Date().toISOString(),
           serverTimestamp: firebase.database.ServerValue.TIMESTAMP
@@ -534,129 +527,6 @@
       }
     });
   }
-
-  // =========================
-  // Transfer
-  // =========================
-  const transferToEl = document.getElementById("transferTo");
-  const transferAmountEl = document.getElementById("transferAmount");
-  const transferNoteEl = document.getElementById("transferNote");
-  const transferBtn = document.getElementById("transferBtn");
-  const transferStatus = document.getElementById("transferStatus");
-
-  async function transferFunds() {
-    if (!transferStatus) return;
-    transferStatus.textContent = "";
-    transferStatus.className = "result";
-    const toUserRaw = (transferToEl?.value || "").trim();
-    const amount = parseInt(transferAmountEl?.value, 10);
-    const note = (transferNoteEl?.value || "").trim();
-
-    if (!toUserRaw) { alert("Vui lòng nhập tên người nhận."); return; }
-    if (toUserRaw === currentUser) { alert("Không thể chuyển cho chính bạn."); return; }
-    if (isNaN(amount) || amount <= 0) { alert("Vui lòng nhập số tiền hợp lệ."); return; }
-
-    if (transferBtn) transferBtn.disabled = true;
-
-    try {
-      const senderRef = db.ref("users/" + currentUser);
-      const recipientRef = db.ref("users/" + toUserRaw);
-
-      const recipientSnap = await recipientRef.once("value");
-      if (!recipientSnap.exists()) { alert("Không tìm thấy người nhận: " + toUserRaw); return; }
-
-      const deducted = await new Promise((resolve, reject) => {
-        senderRef.child("balance").transaction(currentBalance => {
-          const balance = currentBalance || 0;
-          if (balance < amount) return;
-          return balance - amount;
-        }, (error, committed) => {
-          if (error) reject(error);
-          else if (!committed) resolve(false);
-          else resolve(true);
-        });
-      });
-
-      if (!deducted) { alert("Không đủ số dư để chuyển."); return; }
-
-      const credited = await new Promise((resolve, reject) => {
-        recipientRef.child("balance").transaction(currentBalance => {
-          const balance = currentBalance || 0;
-          return balance + amount;
-        }, (error, committed) => {
-          if (error) reject(error);
-          else if (!committed) resolve(false);
-          else resolve(true);
-        });
-      });
-
-      if (!credited) {
-        await senderRef.child("balance").transaction(b => (b || 0) + amount);
-        alert("Chuyển khoản thất bại. Đã hoàn lại số dư.");
-        return;
-      }
-
-      const transferLogRef = db.ref("transfers").push();
-      await transferLogRef.set({
-        from: currentUser,
-        to: toUserRaw,
-        amount: amount,
-        note: note || null,
-        timestamp: new Date().toISOString(),
-        serverTimestamp: firebase.database.ServerValue.TIMESTAMP,
-        status: "success"
-      });
-
-      if (transferAmountEl) transferAmountEl.value = "";
-      transferStatus.textContent = `Đã chuyển ${formatMoney(amount)} tới ${toUserRaw}.`;
-      transferStatus.classList.add("win");
-
-    } catch (err) {
-      console.error(err);
-      try {
-        const transferLogRef = db.ref("transfers").push();
-        await transferLogRef.set({
-          from: currentUser,
-          to: (transferToEl?.value || "").trim(),
-          amount: parseInt(transferAmountEl?.value, 10) || 0,
-          note: (transferNoteEl?.value || "").trim() || null,
-          timestamp: new Date().toISOString(),
-          serverTimestamp: firebase.database.ServerValue.TIMESTAMP,
-          status: "error",
-          errorMessage: String(err)
-        });
-      } catch (_) {}
-      alert("Có lỗi xảy ra khi chuyển khoản.");
-    } finally {
-      if (transferBtn) transferBtn.disabled = false;
-    }
-  }
-
-  if (transferBtn) transferBtn.addEventListener("click", transferFunds);
-
-  // Lịch sử chuyển khoản (gần đây)
-  const transferListEl = document.getElementById("transferList");
-  if (transferListEl) {
-    db.ref("transfers").limitToLast(50).on("value", snap => {
-      const items = [];
-      snap.forEach(child => {
-        const t = child.val() || {};
-        if (t.from === currentUser || t.to === currentUser) {
-          const dir = t.from === currentUser ? "➡️" : "⬅️";
-          const counterparty = t.from === currentUser ? t.to : t.from;
-          const sign = t.from === currentUser ? "-" : "+";
-          items.push(
-            `<li>${dir} ${counterparty} — ${sign}${formatMoney(t.amount)} <small style="color:#777;">(${new Date(t.timestamp).toLocaleString()})</small></li>`
-          );
-        }
-      });
-      items.reverse();
-      transferListEl.innerHTML = items.join("");
-    });
-  }
-
-  // Live update user (đã có ở trên)
-  db.ref("users/" + currentUser).on("value", updateUserInfo);
 </script>
 
 </body>
