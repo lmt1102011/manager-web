@@ -52,7 +52,11 @@
   <header>
     <h1>📋 Manager — Coin & Chứng khoán</h1>
     <div class="header-actions">
-      <div class="status" id="marketStatusDisplay">Đang tải trạng thái sàn...</div>
+      <div class="status">
+        <div>Coin: <span id="marketStatusCoin">Đang tải...</span></div>
+        <div>CK: <span id="marketStatusStock">Đang tải...</span></div>
+      </div>
+
       <a href="index.html" id="logoutBtn" class="btn btn-soft">Đăng xuất</a>
     </div>
   </header>
@@ -65,8 +69,11 @@
 
   <div class="card">
     <div class="actions">
-      <button class="btn-primary" onclick="setMarketStatus('open')">🟢 Mở sàn</button>
-      <button class="btn-primary" onclick="setMarketStatus('closed')">🔴 Đóng sàn</button>
+      <button class="btn-primary" onclick="setMarketStatus('coin', 'open')">🟢 Mở sàn Coin</button>
+      <button class="btn-primary" onclick="setMarketStatus('coin', 'closed')">🔴 Đóng sàn Coin</button>
+      <button class="btn-primary" onclick="setMarketStatus('stock', 'open')">🟢 Mở sàn CK</button>
+      <button class="btn-primary" onclick="setMarketStatus('stock', 'closed')">🔴 Đóng sàn CK</button>
+
       <button class="btn-primary" onclick="refreshAll()">🔄 Làm mới</button>
     </div>
 
@@ -209,17 +216,29 @@
     }
 
     // ===== Market status =====
-    function setMarketStatus(status) {
-      const statusText = status === "open" ? "✅ Sàn đã mở." : "🚫 Sàn đã đóng.";
-      db.ref("market").set({ status })
-        .then(() => alert(statusText))
-        .catch(err => alert("❌ Lỗi cập nhật trạng thái: " + err.message));
-    }
-    db.ref("market/status").on("value", snap => {
-      const status = snap.val();
-      const el = document.getElementById("marketStatusDisplay");
-      el.textContent = status === "open" ? "🟢 Sàn đang mở" : "🔴 Sàn đang đóng";
-    });
+    function setMarketStatus(type, status) {
+  const refPath = type === 'coin' ? 'market_coin/status' : 'market_stock/status';
+  const statusText = status === "open" ? `✅ Sàn ${type === 'coin' ? 'Coin' : 'CK'} đã mở.` : `🚫 Sàn ${type === 'coin' ? 'Coin' : 'CK'} đã đóng.`;
+  db.ref(refPath).set(status)
+    .then(() => alert(statusText))
+    .catch(err => alert("❌ Lỗi cập nhật trạng thái: " + err.message));
+}
+
+// Hiển thị trạng thái Coin
+db.ref("market_coin/status").on("value", snap => {
+  const el = document.getElementById("marketStatusCoin");
+  const status = snap.val();
+  el.textContent = status === "open" ? "🟢 Đang mở" : "🔴 Đang đóng";
+});
+
+// Hiển thị trạng thái Chứng khoán
+db.ref("market_stock/status").on("value", snap => {
+  const el = document.getElementById("marketStatusStock");
+  const status = snap.val();
+  el.textContent = status === "open" ? "🟢 Đang mở" : "🔴 Đang đóng";
+});
+
+
 
     // ===== WinRate config =====
     const winRateCfgRef = db.ref("config/stock/winRate");
@@ -240,40 +259,89 @@
     }
 
     // ===== Render Coin =====
-    async function renderCoinList() {
-      const tbody = document.getElementById("coinLogTable");
-      tbody.innerHTML = "";
-      try {
-        const snap = await db.ref("logs").once("value");
-        const rows = [];
-        snap.forEach(child => rows.push({ key: child.key, ...child.val() }));
-        rows.sort((a, b) => {
-          const ta = a.serverTimestamp ?? (a.timestamp ? new Date(a.timestamp).getTime() : -Infinity);
-          const tb = b.serverTimestamp ?? (b.timestamp ? new Date(b.timestamp).getTime() : -Infinity);
-          return tb - ta;
-        });
+  async function renderCoinList() {
+  const tbody = document.getElementById("coinLogTable");
+  tbody.innerHTML = "";
+  try {
+    const snap = await db.ref("logs").once("value");
+    const rows = [];
+    snap.forEach(child => rows.push({ key: child.key, ...child.val() }));
+    rows.sort((a, b) => {
+      const ta = a.serverTimestamp ?? (a.timestamp ? new Date(a.timestamp).getTime() : -Infinity);
+      const tb = b.serverTimestamp ?? (b.timestamp ? new Date(b.timestamp).getTime() : -Infinity);
+      return tb - ta;
+    });
 
-        let totalAmount = 0;
-        if (rows.length === 0) {
-          tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Không có lệnh nào.</td></tr>`;
-        } else {
-          rows.forEach(log => {
-            const username = safe(log, "username", "-");
-            const amount = Number(safe(log, "amount", 0));
-            const ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : "-";
-            totalAmount += amount || 0;
-            const tr = document.createElement("tr");
-            tr.innerHTML = `<td>${username}</td><td class="right">${formatCurrency(amount)}</td><td>${ts}</td>`;
-            tbody.appendChild(tr);
-          });
-        }
-        document.getElementById("coinTotalCount").textContent = rows.length;
-        document.getElementById("coinTotalAmount").textContent = formatCurrency(totalAmount);
-      } catch (err) {
-        console.error("Render coin error:", err);
-        tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Lỗi hiển thị: ${String(err)}</td></tr>`;
-      }
+    let totalAmount = 0;
+    if (rows.length === 0) {
+      tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Không có lệnh nào.</td></tr>`;
+    } else {
+      rows.forEach(log => {
+        const username = safe(log, "username", "-");
+        const amount = Number(safe(log, "amount", 0));
+        const ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : "-";
+        totalAmount += amount || 0;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${username}</td>
+          <td class="right">${formatCurrency(amount)}</td>
+          <td>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div>${ts}</div>
+              <div>
+                <button class="btn-win btn-mini" data-user="${username}" data-amount="${amount}">Thắng</button>
+                <button class="btn-lose btn-mini" data-user="${username}" data-logkey="${log.key}">Thua</button>
+              </div>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
     }
+
+    document.getElementById("coinTotalCount").textContent = rows.length;
+    document.getElementById("coinTotalAmount").textContent = formatCurrency(totalAmount);
+  } catch (err) {
+    console.error("Render coin error:", err);
+    tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Lỗi hiển thị: ${String(err)}</td></tr>`;
+  }
+}
+document.getElementById("coinLogTable").addEventListener("click", async (e) => {
+  const winBtn = e.target.closest(".btn-win");
+  const loseBtn = e.target.closest(".btn-lose");
+
+  if (winBtn) {
+    const username = winBtn.dataset.user;
+    const amount = Number(winBtn.dataset.amount || 0);
+    if (!username || !amount) return;
+    try {
+      await db.ref("users/" + username + "/balance").transaction(curr => (curr || 0) + amount * 2);
+      // Tìm và xóa log tương ứng
+      const snap = await db.ref("logs").once("value");
+      snap.forEach(child => {
+        const v = child.val() || {};
+        if (v.username === username && Number(v.amount) === amount) {
+          db.ref("logs/" + child.key).remove();
+        }
+      });
+      renderCoinList();
+    } catch (err) {
+      alert("❌ Lỗi xử lý thắng: " + err.message);
+    }
+  }
+
+  if (loseBtn) {
+    const key = loseBtn.dataset.logkey;
+    if (!key) return;
+    try {
+      await db.ref("logs/" + key).remove();
+      renderCoinList();
+    } catch (err) {
+      alert("❌ Lỗi xử lý thua: " + err.message);
+    }
+  }
+});
+
 
     // ===== Coin bulk actions =====
     async function handleWinCoin() {
@@ -310,48 +378,67 @@
 
     // ===== Render Stock =====
     function renderStockListFromSnap(snap) {
-      const tbody = document.getElementById("stockLogTable");
-      try {
-        const rows = [];
-        snap.forEach(child => rows.push({ key: child.key, ...child.val() }));
-        rows.sort((a, b) => {
-          const ta = a.serverTimestamp ?? (a.timestamp ? new Date(a.timestamp).getTime() : -Infinity);
-          const tb = b.serverTimestamp ?? (b.timestamp ? new Date(b.timestamp).getTime() : -Infinity);
-          return tb - ta;
-        });
-
-        let totalAmount = 0;
-        if (rows.length === 0) {
-          tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Không có lệnh nào.</td></tr>`;
-        } else {
-          tbody.innerHTML = "";
-          rows.forEach(log => {
-            const username = safe(log, "username", "-");
-            const amount = Number(safe(log, "amount", 0));
-            const winRate = safe(log, "winRate", "-");
-            const finalBar = safe(log, "finalBar", "-");
-            const result = safe(log, "result", "-");
-            const ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : "-";
-            totalAmount += amount || 0;
-            const tr = document.createElement("tr");
-            tr.innerHTML = `
-              <td>${username}</td>
-              <td class="right">${formatCurrency(amount)}</td>
-              <td>${winRate === "-" ? "-" : (winRate + "%")}</td>
-              <td>${finalBar}</td>
-              <td>${result}</td>
-              <td>${ts}</td>
-            `;
-            tbody.appendChild(tr);
-          });
-        }
-        document.getElementById("stockTotalCount").textContent = rows.length;
-        document.getElementById("stockTotalAmount").textContent = formatCurrency(totalAmount);
-      } catch (err) {
-        console.error("Render stock error:", err);
-        tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Lỗi hiển thị: ${String(err)}</td></tr>`;
+  const tbody = document.getElementById("stockLogTable");
+  try {
+    const rows = [];
+    const data = snap.val() || {};
+    for (const key in data) {
+      if (data.hasOwnProperty(key)) {
+        rows.push({ key, ...data[key] });
       }
     }
+
+    function getTimeSafe(log) {
+      try {
+        return new Date(log.timestamp).getTime() || 0;
+      } catch {
+        return 0;
+      }
+    }
+
+    rows.sort((a, b) => getTimeSafe(b) - getTimeSafe(a));
+
+    let totalAmount = 0;
+    if (rows.length === 0) {
+      tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Không có lệnh nào.</td></tr>`;
+    } else {
+      tbody.innerHTML = "";
+      rows.forEach(log => {
+        const username = safe(log, "username", "-");
+        const amount = Number(safe(log, "amount", 0));
+        const winRate = safe(log, "winRate", "-");
+        const finalBar = safe(log, "finalBar", "-");
+        const result = safe(log, "result", "-");
+
+        let ts = "-";
+        try {
+          ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : "-";
+        } catch {}
+
+        totalAmount += amount || 0;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${username}</td>
+          <td class="right">${formatCurrency(amount)}</td>
+          <td>${winRate === "-" ? "-" : (winRate + "%")}</td>
+          <td>${finalBar}</td>
+          <td>${result}</td>
+          <td>${ts}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.getElementById("stockTotalCount").textContent = rows.length;
+    document.getElementById("stockTotalAmount").textContent = formatCurrency(totalAmount);
+  } catch (err) {
+    console.error("Render stock error:", err);
+    tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Lỗi hiển thị: ${String(err)}</td></tr>`;
+  }
+}
+
+
 
     async function renderStockListOnce() {
       const tbody = document.getElementById("stockLogTable");
