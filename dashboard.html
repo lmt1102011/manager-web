@@ -623,7 +623,6 @@ if (transferBtn) {
   });
 }
 
-// Lịch sử chuyển khoản gần đây
 function renderTransferHistory() {
   const list = document.getElementById("transferList");
   if (!list) return;
@@ -631,7 +630,7 @@ function renderTransferHistory() {
   db.ref("transfers")
     .orderByChild("serverTimestamp")
     .limitToLast(20)
-    .once("value", snap => {
+    .on("value", snap => {
       const items = [];
       snap.forEach(child => {
         const tx = child.val();
@@ -639,13 +638,15 @@ function renderTransferHistory() {
           const dir = tx.from === currentUser ? "→" : "←";
           const user = tx.from === currentUser ? tx.to : tx.from;
           const sign = tx.from === currentUser ? "-" : "+";
-          const item = `<li>${sign}${tx.amount.toLocaleString()}₫ ${dir} ${user}${tx.note ? ` — ${tx.note}` : ""}</li>`;
+          const note = tx.note ? ` — ${tx.note}` : "";
+          const item = `<li>${sign}${Number(tx.amount).toLocaleString()}₫ ${dir} ${user}${note}</li>`;
           items.unshift(item);
         }
       });
       list.innerHTML = items.join("");
     });
 }
+
 
 // Gọi khi vào trang
 renderTransferHistory();
