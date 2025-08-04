@@ -688,7 +688,7 @@ async function updateBankInterest() {
   const lastTime = bank.lastInterestTime || now;
   const balance = bank.balance || 0;
   const minutes = Math.floor((now - lastTime) / 60000);
-  const interestRatePerMinute = 0.01; // 1%
+  const interestRatePerMinute = 0.005; // 0.5%
 
   if (minutes > 0) {
     const newBalance = Math.floor(balance * Math.pow(1 + interestRatePerMinute, minutes));
@@ -699,12 +699,19 @@ async function updateBankInterest() {
   }
 }
 
+setInterval(updateBankInterest, 1000);
+
 function loadBankBalance() {
-  db.ref("users/" + currentUser + "/bank/balance").on("value", snap => {
-    const val = snap.val() || 0;
-    if (bankBalanceEl) bankBalanceEl.textContent = formatMoney(val);
+  const userRef = db.ref("users/" + currentUser + "/bank/balance");
+
+  userRef.on("value", snapshot => {
+    const val = snapshot.val() || 0;
+    if (bankBalanceEl) {
+      bankBalanceEl.textContent = formatMoney(val);
+    }
   });
 }
+
 
 bankDepositBtn?.addEventListener("click", async () => {
   const amount = parseInt(document.getElementById("bankDeposit").value);
