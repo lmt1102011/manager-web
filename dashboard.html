@@ -119,7 +119,7 @@
     <button id="withdrawBankBtn">Rút từ ngân hàng</button>
   </div>
   <p style="margin-top: 10px;">Tiền trong ngân hàng: <strong id="bankBalance">0₫</strong></p>
-  <p style="font-size: 14px; color: #888;">* Ngân hàng tự động cộng lãi 1% mỗi phút.</p>
+  <p style="font-size: 14px; color: #888;">* Ngân hàng tự động cộng lãi 0.25% mỗi phút.</p>
 </div>
 
 
@@ -709,7 +709,7 @@ async function updateBankInterest() {
   const lastTime = bank.lastInterestTime || now;
   const balance = bank.balance || 0;
   const minutes = Math.floor((now - lastTime) / 60000);
-  const interestRatePerMinute = 0.005; // 0.5%
+  const interestRatePerMinute = 0.0025; // 0.25%
 
   if (minutes > 0) {
     const newBalance = Math.floor(balance * Math.pow(1 + interestRatePerMinute, minutes));
