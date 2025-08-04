@@ -464,86 +464,106 @@
   // Stock Game
   // =========================
   const stockResult = document.getElementById("stockResult");
-  const placeStockBetBtn = document.getElementById("placeStockBet");
-  let stockWinRate = 50;
+const placeStockBetBtn = document.getElementById("placeStockBet");
+let stockWinRate = 50;
 
-  const winRateRef = db.ref("config/stock/winRate");
-  winRateRef.on("value", snap => {
-    const val = Number(snap.val());
-    stockWinRate = Number.isFinite(val) ? Math.max(0, Math.min(100, Math.round(val))) : 50;
-  });
+// Lấy tỷ lệ thắng từ cấu hình
+const winRateRef = db.ref("config/stock/winRate");
+winRateRef.on("value", snap => {
+  const val = Number(snap.val());
+  stockWinRate = Number.isFinite(val) ? Math.max(0, Math.min(100, Math.round(val))) : 50;
+});
 
-  if (placeStockBetBtn) {
-    placeStockBetBtn.addEventListener("click", async () => {
-      if (!isMarketOpen) { alert("Sàn đang đóng."); return; }
+// Xử lý sự kiện khi nhấn nút Đặt cược
+if (placeStockBetBtn) {
+  placeStockBetBtn.addEventListener("click", async () => {
+    if (!isMarketOpenStock) {
+      alert("Sàn chứng khoán đang đóng.");
+      return;
+    }
 
-      const amountEl = document.getElementById("amountStock");
-      const amount = parseInt(amountEl.value);
-      if (isNaN(amount) || amount <= 0) { alert("Vui lòng nhập số tiền hợp lệ."); return; }
+    const amountEl = document.getElementById("amountStock");
+    const amount = parseInt(amountEl.value);
 
-      placeStockBetBtn.disabled = true;
-      if (stockResult) { stockResult.textContent = ""; stockResult.className = "result"; }
+    // ✅ Kiểm tra số tiền phải lớn hơn 5.000₫
+    if (isNaN(amount) || amount <= 5000) {
+      alert("Vui lòng nhập số tiền lớn hơn 5.000₫");
+      return;
+    }
 
-      try {
-        const userRef = db.ref("users/" + currentUser);
+    placeStockBetBtn.disabled = true;
+    if (stockResult) {
+      stockResult.textContent = "";
+      stockResult.className = "result";
+    }
 
-        const deducted = await new Promise((resolve, reject) => {
-          userRef.child("balance").transaction(currentBalance => {
-            const balance = currentBalance || 0;
-            if (balance < amount) return;
-            return balance - amount;
-          }, (error, committed) => {
-            if (error) reject(error);
-            else if (!committed) resolve(false);
-            else resolve(true);
-          });
+    try {
+      const userRef = db.ref("users/" + currentUser);
+
+      // Trừ tiền nếu đủ
+      const deducted = await new Promise((resolve, reject) => {
+        userRef.child("balance").transaction(currentBalance => {
+          const balance = currentBalance || 0;
+          if (balance < amount) return;
+          return balance - amount;
+        }, (error, committed) => {
+          if (error) reject(error);
+          else if (!committed) resolve(false);
+          else resolve(true);
         });
+      });
 
-        if (!deducted) { alert("Không đủ số dư."); return; }
-
-        const startFrom = 100 + Math.random() * 10;
-
-        // Dùng winRate để xác định thắng/thua từ đầu
-        const isWin = Math.random() * 100 < stockWinRate;
-
-        // Tạo biểu đồ theo hướng thắng/thua
-        const { finalIndex } = await playCandles(5000, startFrom, 45, 5.0, isWin);
-
-        if (isWin) {
-          await userRef.child("balance").transaction(balance => (balance || 0) + (amount * 2));
-          if (stockResult) {
-            stockResult.textContent = `Thắng! +${ (amount * 2).toLocaleString() }₫`;
-            stockResult.classList.add("win");
-          }
-        } else {
-          if (stockResult) {
-            stockResult.textContent = `Thua! -${ amount.toLocaleString() }₫`;
-            stockResult.classList.add("lose");
-          }
-        }
-
-        const newLogRef = db.ref("logs_stock").push();
-        await newLogRef.set({
-          type: "stock",
-          username: currentUser,
-          amount: amount,
-          winRate: stockWinRate,
-          finalBar: finalIndex,
-          result: isWin ? "win" : "lose",
-          timestamp: new Date().toISOString(),
-          serverTimestamp: firebase.database.ServerValue.TIMESTAMP
-        });
-
-        if (amountEl) amountEl.value = "";
-        renderTotalSubmitStock();
-      } catch (err) {
-        console.error(err);
-        alert("Có lỗi xảy ra.");
-      } finally {
-        placeStockBetBtn.disabled = false;
+      if (!deducted) {
+        alert("Không đủ số dư.");
+        return;
       }
-    });
-  }
+
+      const startFrom = 100 + Math.random() * 10;
+
+      // Dùng winRate để quyết định kết quả
+      const isWin = Math.random() * 100 < stockWinRate;
+
+      // Chạy biểu đồ nến
+      const { finalIndex } = await playCandles(5000, startFrom, 45, 5.0, isWin);
+
+      // Cộng tiền nếu thắng
+      if (isWin) {
+        await userRef.child("balance").transaction(balance => (balance || 0) + (amount * 2));
+        if (stockResult) {
+          stockResult.textContent = `Thắng! +${(amount * 2).toLocaleString()}₫`;
+          stockResult.classList.add("win");
+        }
+      } else {
+        if (stockResult) {
+          stockResult.textContent = `Thua! -${amount.toLocaleString()}₫`;
+          stockResult.classList.add("lose");
+        }
+      }
+
+      // Ghi log kết quả
+      const newLogRef = db.ref("logs_stock").push();
+      await newLogRef.set({
+        type: "stock",
+        username: currentUser,
+        amount: amount,
+        winRate: stockWinRate,
+        finalBar: finalIndex,
+        result: isWin ? "win" : "lose",
+        timestamp: new Date().toISOString(),
+        serverTimestamp: firebase.database.ServerValue.TIMESTAMP
+      });
+
+      if (amountEl) amountEl.value = "";
+      renderTotalSubmitStock();
+    } catch (err) {
+      console.error(err);
+      alert("Có lỗi xảy ra.");
+    } finally {
+      placeStockBetBtn.disabled = false;
+    }
+  });
+}
+
   // =========================
 // Chuyển khoản
 // =========================
@@ -734,30 +754,12 @@ bankDepositBtn?.addEventListener("click", async () => {
   alert("Đã gửi vào ngân hàng.");
 });
 
-bankWithdrawBtn?.addEventListener("click", async () => {
-  const amount = parseInt(document.getElementById("bankWithdraw").value);
-  if (isNaN(amount) || amount <= 0) return alert("Số tiền không hợp lệ.");
-
-  const userRef = db.ref("users/" + currentUser);
-  await updateBankInterest();
-
-  const snap = await userRef.once("value");
-  const user = snap.val();
-  const bankBalance = user.bank?.balance || 0;
-
-  if (amount > bankBalance) return alert("Không đủ tiền trong ngân hàng.");
-
-  await Promise.all([
-    userRef.child("balance").set(user.balance + amount),
-    userRef.child("bank/balance").set(bankBalance - amount),
-    userRef.child("bank/lastInterestTime").set(Date.now())
-  ]);
-
-  alert("Đã rút tiền từ ngân hàng.");
-});
-
-loadBankBalance();
-
+function placeStockBet(amount) {
+  // Ghi dữ liệu đặt cược vào Firebase hoặc xử lý logic
+  console.log("Đặt cược:", amount);
+  alert("Bạn đã đặt cược " + amount.toLocaleString() + "₫");
+}
+ 
 </script>
 
 </body>
