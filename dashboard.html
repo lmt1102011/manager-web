@@ -257,13 +257,19 @@
 
   // ===== Initial load =====
   db.ref("users/" + currentUser).once("value")
-    .then(updateUserInfo)
-    .then(() => { renderTotalSubmitCoin(); renderTotalSubmitStock(); })
-    .catch(() => {
-      alert("Tài khoản không hợp lệ.");
-      clearSession();
-      location.href = "index.html";
-    });
+  .then(updateUserInfo)
+  .then(() => {
+    renderTotalSubmitCoin();
+    renderTotalSubmitStock();
+    loadBankBalance(); // ✅ THÊM DÒNG NÀY
+  })
+  .catch(() => {
+    alert("Tài khoản không hợp lệ.");
+    clearSession();
+    location.href = "index.html";
+  });
+
+
 
   // Live updates
   db.ref("users/" + currentUser).on("value", updateUserInfo);
@@ -701,7 +707,10 @@ const bankBalanceEl = document.getElementById("bankBalance");
 const bankDepositBtn = document.getElementById("depositBankBtn");
 const bankWithdrawBtn = document.getElementById("withdrawBankBtn");
 
+// Cập nhật lãi suất tự động mỗi phút
 async function updateBankInterest() {
+  if (!currentUser) return;
+
   const userRef = db.ref("users/" + currentUser + "/bank");
   const snap = await userRef.once("value");
   const bank = snap.val() || {};
@@ -709,7 +718,7 @@ async function updateBankInterest() {
   const lastTime = bank.lastInterestTime || now;
   const balance = bank.balance || 0;
   const minutes = Math.floor((now - lastTime) / 60000);
-  const interestRatePerMinute = 0.0025; // 0.25%
+  const interestRatePerMinute = 0.0025;
 
   if (minutes > 0) {
     const newBalance = Math.floor(balance * Math.pow(1 + interestRatePerMinute, minutes));
@@ -720,20 +729,20 @@ async function updateBankInterest() {
   }
 }
 
-setInterval(updateBankInterest, 1000);
+// Gọi mỗi phút một lần
+setInterval(updateBankInterest, 60000);
 
+// Hiển thị realtime tiền trong ngân hàng
 function loadBankBalance() {
+  if (!currentUser) return;
   const userRef = db.ref("users/" + currentUser + "/bank/balance");
-
   userRef.on("value", snapshot => {
-    const val = snapshot.val() || 0;
-    if (bankBalanceEl) {
-      bankBalanceEl.textContent = formatMoney(val);
-    }
+    const val = snapshot.val();
+    bankBalanceEl.textContent = formatMoney(val || 0);
   });
 }
 
-
+// Gửi tiền vào ngân hàng
 bankDepositBtn?.addEventListener("click", async () => {
   const amount = parseInt(document.getElementById("bankDeposit").value);
   if (isNaN(amount) || amount <= 0) return alert("Số tiền không hợp lệ.");
@@ -741,25 +750,60 @@ bankDepositBtn?.addEventListener("click", async () => {
   const userRef = db.ref("users/" + currentUser);
   const snap = await userRef.once("value");
   const user = snap.val();
-  if (!user || user.balance < amount) return alert("Không đủ số dư.");
+  const currentBalance = user.balance || 0;
+  const bankBalance = user.bank?.balance || 0;
 
-  await updateBankInterest();
+  if (currentBalance < amount) return alert("Không đủ số dư.");
 
-  await Promise.all([
-    userRef.child("balance").set(user.balance - amount),
-    userRef.child("bank/balance").set((user.bank?.balance || 0) + amount),
-    userRef.child("bank/lastInterestTime").set(Date.now())
-  ]);
+  // KHÔNG cần updateBankInterest ở đây → vì bạn sắp ghi đè số mới rồi
+  const now = Date.now();
+  await userRef.update({
+    balance: currentBalance - amount,
+    bank: {
+      balance: bankBalance + amount,
+      lastInterestTime: now
+    }
+  });
 
   alert("Đã gửi vào ngân hàng.");
 });
 
-function placeStockBet(amount) {
-  // Ghi dữ liệu đặt cược vào Firebase hoặc xử lý logic
-  console.log("Đặt cược:", amount);
-  alert("Bạn đã đặt cược " + amount.toLocaleString() + "₫");
+// Rút tiền từ ngân hàng
+bankWithdrawBtn?.addEventListener("click", async () => {
+  const amount = parseInt(document.getElementById("bankWithdraw").value);
+  if (isNaN(amount) || amount <= 0) return alert("Số tiền không hợp lệ.");
+
+  const userRef = db.ref("users/" + currentUser);
+  const snap = await userRef.once("value");
+  const user = snap.val();
+  const bank = user.bank || {};
+  const currentBalance = user.balance || 0;
+  const bankBalance = bank.balance || 0;
+  const lastTime = bank.lastInterestTime || Date.now();
+  const now = Date.now();
+
+  const minutes = Math.floor((now - lastTime) / 60000);
+  const interestRatePerMinute = 0.0025;
+  const updatedBankBalance = Math.floor(bankBalance * Math.pow(1 + interestRatePerMinute, minutes));
+
+  if (updatedBankBalance < amount) return alert("Không đủ tiền trong ngân hàng.");
+
+  await userRef.update({
+    balance: currentBalance + amount,
+    bank: {
+      balance: updatedBankBalance - amount,
+      lastInterestTime: now
+    }
+  });
+
+  alert("Đã rút từ ngân hàng.");
+});
+
+// Format tiền VND
+function formatMoney(n) {
+  return n.toLocaleString('vi-VN') + "₫";
 }
- 
+
 </script>
 
 </body>
