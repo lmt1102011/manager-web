@@ -210,6 +210,10 @@ main.dashboard {
     .tab-content {
       width: 100%;
       animation: fadeInTab 0.3s;
+      min-height: 420px;
+      /* Đảm bảo chiều cao tối thiểu để các tab không bị tụt */
+      display: block;
+      position: relative;
     }
     @keyframes fadeInTab {
       from { opacity: 0; transform: translateY(10px); }
@@ -239,7 +243,193 @@ main.dashboard {
     <div class="tab-bar">
       <button class="tab-btn active" data-tab="coin">Coin</button>
       <button class="tab-btn" data-tab="stock">Chứng khoán</button>
-      <button class="tab-btn" data-tab="bank">Ngân hàng</button>
+  <button class="tab-btn" data-tab="bank">Ngân hàng</button>
+  <button class="tab-btn" data-tab="loan">Vay ngân hàng</button>
+    <div class="tab-content" id="tab-loan" style="display:none">
+      <div class="game" id="game-loan">
+        <div id="loan-form-area">
+          <h3>Vay ngân hàng</h3>
+          <div class="options" style="flex-wrap: wrap;">
+            <label for="loanAmount">Số tiền cần vay:</label>
+            <input type="number" id="loanAmount" min="1000" placeholder="Nhập số tiền" style="margin-right:10px;">
+            <label for="loanDays">Số ngày vay:</label>
+            <input type="number" id="loanDays" min="1" placeholder="Số ngày" style="margin-right:10px;">
+            <button id="loanSubmitBtn">Vay</button>
+          </div>
+          <div style="color:#1976d2;font-size:15px;margin-top:10px;">Lãi suất: <b>25%/30 phút</b> (tính liên tục kể cả khi offline)</div>
+          <div id="loanError" style="color:#e53935;margin-top:10px;"></div>
+        </div>
+        <div id="loan-receipt-area" style="display:none">
+          <h3>Biên lai khoản vay</h3>
+          <div class="receipt-box">
+            <div><b>Số tiền đã vay:</b> <span id="receiptAmount"></span></div>
+            <div><b>Ngày vay:</b> <span id="receiptStart"></span></div>
+            <div><b>Số ngày vay:</b> <span id="receiptDays"></span></div>
+            <div><b>Số tiền phải trả (gốc + lãi):</b> <span id="receiptTotal"></span></div>
+            <div style="font-size:13px;color:#888;">Lãi được tính liên tục, kể cả khi bạn offline.</div>
+            <button id="repayLoanBtn" style="margin-top:18px;">Trả nợ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <style>
+      #tab-loan .game { max-width: 500px; margin: 30px auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); padding: 32px 24px; }
+      #tab-loan h3 { color: #1a237e; text-align: center; margin-bottom: 18px; }
+      #tab-loan .options label { font-weight: 500; color: #333; margin-right: 6px; }
+      #tab-loan .options input[type="number"] { width: 120px; padding: 7px 10px; border: 1px solid #bdbdbd; border-radius: 6px; font-size: 15px; margin-bottom: 0; }
+      #tab-loan .options button { background: #1976d2; color: #fff; border: none; padding: 8px 22px; border-radius: 6px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+      #tab-loan .options button:hover { background: #0d47a1; }
+      #loan-receipt-area .receipt-box { background: #f7fbff; border-radius: 10px; padding: 22px 18px; box-shadow: 0 2px 8px rgba(31,102,204,0.06); margin-top: 10px; }
+      #loan-receipt-area .receipt-box div { margin-bottom: 10px; font-size: 16px; }
+      #repayLoanBtn { background: #e53935; color: #fff; border: none; border-radius: 5px; padding: 10px 30px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+      #repayLoanBtn:hover { background: #b71c1c; }
+    </style>
+    <script>
+    // Tab chuyển đổi
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(tab => tab.style.display = 'none');
+        document.getElementById('tab-' + this.getAttribute('data-tab')).style.display = 'block';
+      });
+    });
+
+    // Lưu và lấy khoản vay từ localStorage
+    function getCurrentLoan() {
+      return JSON.parse(localStorage.getItem('currentLoan') || 'null');
+    }
+    function setCurrentLoan(loan) {
+      if (loan) localStorage.setItem('currentLoan', JSON.stringify(loan));
+      else localStorage.removeItem('currentLoan');
+    }
+
+    // Lấy số dư user
+    function getUserBalance() {
+      return parseFloat(localStorage.getItem('userBalance') || '0');
+    }
+    function setUserBalance(val) {
+      localStorage.setItem('userBalance', val);
+      document.getElementById('balance').innerText = Number(val).toLocaleString('vi-VN') + '₫';
+    }
+
+    // Lãi suất 25%/30 phút
+    const LOAN_RATE = 0.25;
+    const LOAN_PERIOD_MS = 30 * 60 * 1000;
+
+    // Hiển thị form hoặc biên lai
+    function renderLoanTab() {
+      const loan = getCurrentLoan();
+      const formArea = document.getElementById('loan-form-area');
+      const receiptArea = document.getElementById('loan-receipt-area');
+      if (!formArea || !receiptArea) return;
+      if (!loan) {
+        formArea.style.display = '';
+        receiptArea.style.display = 'none';
+      } else {
+        formArea.style.display = 'none';
+        receiptArea.style.display = '';
+        // Tính tổng phải trả
+        const now = Date.now();
+        const start = loan.start;
+        const periods = Math.floor((now - start) / LOAN_PERIOD_MS);
+        let total = loan.amount;
+        for (let i = 0; i < periods; i++) total += total * LOAN_RATE;
+        // Hiển thị biên lai
+        document.getElementById('receiptAmount').innerText = Number(loan.amount).toLocaleString('vi-VN') + '₫';
+        document.getElementById('receiptStart').innerText = new Date(loan.start).toLocaleString('vi-VN');
+        document.getElementById('receiptDays').innerText = loan.days;
+        document.getElementById('receiptTotal').innerText = total.toLocaleString('vi-VN', {style:'currency', currency:'VND'});
+        receiptArea.dataset.total = total;
+      }
+    }
+
+    // Xử lý nút vay
+    document.getElementById('loanSubmitBtn').onclick = function() {
+      const amount = parseFloat(document.getElementById('loanAmount').value);
+      const days = parseInt(document.getElementById('loanDays').value);
+      if (isNaN(amount) || amount < 1000 || isNaN(days) || days < 1) {
+        document.getElementById('loanError').innerText = 'Vui lòng nhập số tiền và số ngày hợp lệ.';
+        return;
+      }
+      if (getCurrentLoan()) {
+        document.getElementById('loanError').innerText = 'Bạn phải trả hết khoản vay cũ trước khi vay tiếp!';
+        return;
+      }
+      // Kiểm tra currentUser
+      if (!window.currentUser || typeof currentUser !== 'string' || !currentUser.trim()) {
+        alert('Không xác định được tài khoản người dùng. Vui lòng đăng nhập lại!');
+        return;
+      }
+      // Cộng tiền vào Firebase
+      const userRef = db.ref("users/" + currentUser + "/balance");
+      userRef.transaction(function(balance) {
+        return (balance || 0) + amount;
+      }, function(error, committed, snapshot) {
+        if (error) {
+          alert('Lỗi Firebase: ' + error.message);
+          document.getElementById('loanError').innerText = 'Có lỗi khi cộng tiền vào tài khoản!';
+          return;
+        }
+        if (!committed) {
+          alert('Không thể ghi dữ liệu lên Firebase. Có thể do quyền truy cập hoặc rules.');
+          document.getElementById('loanError').innerText = 'Không thể ghi dữ liệu lên Firebase.';
+          return;
+        }
+        // Lưu khoản vay vào localStorage
+        const loan = { amount, days, start: Date.now() };
+        setCurrentLoan(loan);
+        // Cập nhật giao diện
+        setUserBalance(snapshot.val());
+        document.getElementById('loanAmount').value = '';
+        document.getElementById('loanDays').value = '';
+        document.getElementById('loanError').innerText = '';
+        renderLoanTab();
+      });
+    };
+
+    // Xử lý nút trả nợ
+    document.getElementById('repayLoanBtn').onclick = function() {
+      const loan = getCurrentLoan();
+      if (!loan) return;
+      const now = Date.now();
+      const periods = Math.floor((now - loan.start) / LOAN_PERIOD_MS);
+      let total = loan.amount;
+      for (let i = 0; i < periods; i++) total += total * LOAN_RATE;
+      // Kiểm tra currentUser
+      if (!window.currentUser || typeof currentUser !== 'string' || !currentUser.trim()) {
+        alert('Không xác định được tài khoản người dùng. Vui lòng đăng nhập lại!');
+        return;
+      }
+      // Trừ tiền trên Firebase
+      const userRef = db.ref("users/" + currentUser + "/balance");
+      userRef.transaction(function(balance) {
+        if ((balance || 0) < total) return; // Không đủ tiền
+        return (balance || 0) - total;
+      }, function(error, committed, snapshot) {
+        if (error) {
+          alert('Lỗi Firebase: ' + error.message);
+          return;
+        }
+        if (!committed) {
+          alert('Không thể ghi dữ liệu lên Firebase. Có thể do quyền truy cập hoặc rules.');
+          return;
+        }
+        setCurrentLoan(null);
+        renderLoanTab();
+        alert('Đã trả nợ thành công!');
+      });
+    };
+
+    // Khi vào tab loan thì render lại
+    document.querySelector('button[data-tab="loan"]').addEventListener('click', renderLoanTab);
+
+    // Khi load trang, cập nhật số dư và biên lai nếu có
+    window.addEventListener('DOMContentLoaded', function() {
+      listenUserBalance();
+      renderLoanTab();
+    });
+    </script>
       <button class="tab-btn" data-tab="ati">ATI</button>
       <button class="tab-btn" data-tab="transfer">Chuyển khoản</button>
       <button class="tab-btn" data-tab="history">Lịch sử</button>
@@ -292,7 +482,8 @@ main.dashboard {
 
     <div class="tab-content" id="tab-ati" style="display:none">
       <div class="game" id="game-ati">
-        <h3>Chứng khoán ATI</h3>
+  <h3>Chứng khoán ATI</h3>
+  <div style="font-size:1.08em;color:#1f66cc;font-weight:600;margin-bottom:8px;">1 AIT / 100.000₫</div>
         <div class="candle-wrapper">
           <canvas id="atiCandleCanvas" width="800" height="260"></canvas>
         </div>
@@ -1189,7 +1380,24 @@ bankWithdrawBtn?.addEventListener("click", async () => {
 function formatMoney(n) {
   return n.toLocaleString('vi-VN') + "₫";
 }
-
+// Đảm bảo currentUser luôn đúng khi load trang
+if (!window.currentUser) {
+  window.currentUser = localStorage.getItem('currentUser') || null;
+}
+// Nếu vẫn chưa có currentUser, cảnh báo và chuyển hướng về trang đăng nhập
+if (!window.currentUser) {
+  alert('Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn!');
+  window.location.href = 'index.html';
+}
+// Lắng nghe realtime số dư từ Firebase
+function listenUserBalance() {
+  if (!window.currentUser) return;
+  const userRef = db.ref("users/" + currentUser + "/balance");
+  userRef.on("value", function(snapshot) {
+    const val = snapshot.val() || 0;
+    setUserBalance(val);
+  });
+}
 </script>
 
 </body>
