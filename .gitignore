@@ -1,0 +1,10 @@
+# Node / project
+node_modules/
+dist/
+
+# Environment and local overrides
+.env
+env.js
+
+# Logs
+*.log
