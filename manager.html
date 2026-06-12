@@ -65,6 +65,8 @@
     <button class="tab-btn active" data-target="coinSection">💰 Coin</button>
     <button class="tab-btn" data-target="stockSection">📈 Chứng khoán</button>
     <button class="tab-btn" data-target="usersSection">👤 Người dùng</button>
+    <button class="tab-btn" data-target="receiptsSection">🧾 Biên Lai</button>
+    <button class="tab-btn" data-target="loanNoticeSection">🔔 Nhắc Nợ</button>
   </div>
 
   <div class="card">
@@ -172,6 +174,90 @@
     </div>
   </section>
 
+  <!-- RECEIPTS SECTION -->
+  <section id="receiptsSection" class="section">
+    <div class="card">
+      <h2>🧾 Quản lý Biên Lai</h2>
+      <p class="muted">Tạo biên lai trả nợ cho người dùng hoặc gửi cho tất cả.</p>
+      <div class="actions" style="gap:12px; margin-bottom:16px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:260px;">
+          <label class="block text-sm font-semibold text-slate-700 mb-2">Tìm người dùng</label>
+          <input id="receiptUserSearch" type="text" class="inline-input" placeholder="Tìm theo tên hoặc UID" oninput="renderReceiptUsers()" />
+          <div id="receiptUserList" style="margin-top:12px; max-height:240px; overflow:auto; border:1px solid #d8e8ff; border-radius:12px; background:#fff; padding:8px;"></div>
+          <div id="receiptSelectedChips" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;"></div>
+          <div class="muted" style="margin-top:6px;">Chọn trực tiếp từng người. Nhấn lại để bỏ chọn. Bấm "Tạo cho tất cả" nếu muốn gửi cho toàn bộ.</div>
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label class="block text-sm font-semibold text-slate-700 mb-2">Tiêu đề</label>
+          <input type="text" id="receiptTitle" class="inline-input" placeholder="Tiêu đề biên lai" />
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label class="block text-sm font-semibold text-slate-700 mb-2">Số tiền biên lai (₫)</label>
+          <input type="number" id="receiptAmount" class="inline-input" placeholder="Nhập số tiền" />
+        </div>
+        <div style="flex:1; min-width:220px;">
+          <label class="block text-sm font-semibold text-slate-700 mb-2">Ghi chú</label>
+          <input type="text" id="receiptNote" class="inline-input" placeholder="Nội dung biên lai" />
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
+          <button class="btn-primary" onclick="createReceipt(false)">Tạo cho người chọn</button>
+          <button class="btn-primary" onclick="createReceipt(true)">Tạo cho tất cả</button>
+        </div>
+      </div>
+      <div class="card" style="padding:0;">
+        <div style="padding:16px; border-bottom:1px solid #eee;"><strong>Danh sách biên lai</strong></div>
+        <div style="overflow-x:auto;">
+          <table style="margin:0; width:100%; border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Tiêu đề</th>
+                <th>Ghi chú</th>
+                <th>Người dùng</th>
+                <th class="right">Số tiền</th>
+                <th>Loại</th>
+                <th>Thời gian</th>
+                <th class="nowrap">Hành động</th>
+              </tr>
+            </thead>
+            <tbody id="receiptTableBody">
+              <tr><td class="row-empty" colspan="7">Đang tải...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LOAN NOTICE SECTION -->
+  <section id="loanNoticeSection" class="section">
+    <div class="card">
+      <h2>🔔 Nhắc Nợ</h2>
+      <p class="muted">Xem khoản vay mỗi người và gửi nhắc nợ riêng hoặc tất cả.</p>
+      <div class="actions" style="gap:12px; margin-bottom:16px;">
+        <button class="btn-soft" onclick="renderLoanReminders()">🔄 Làm mới</button>
+        <button class="btn-primary" onclick="notifyLoanReminderAll()">📣 Nhắc tất cả</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>User ID</th>
+              <th>Tên</th>
+              <th class="right">Số tiền vay</th>
+              <th>Trạng thái</th>
+              <th>Thời gian vay</th>
+              <th class="nowrap">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="loanReminderTableBody">
+            <tr><td class="row-empty" colspan="6">Đang tải...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
   <script>
     // ===== Firebase Config =====
       const firebaseConfig = {
@@ -213,6 +299,14 @@
     function safe(obj, path, def = "") {
       try { return path.split(".").reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj) ?? def; }
       catch { return def; }
+    }
+    function normalizeKey(value) {
+      return String(value ?? "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
     }
 
     // ===== Market status =====
@@ -259,55 +353,80 @@ db.ref("market_stock/status").on("value", snap => {
     }
 
     // ===== Render Coin =====
-  async function renderCoinList() {
-  const tbody = document.getElementById("coinLogTable");
-  tbody.innerHTML = "";
-  try {
-    const snap = await db.ref("logs").once("value");
-    const rows = [];
+    async function renderCoinList() {
+      const tbody = document.getElementById("coinLogTable");
+      tbody.innerHTML = "";
+      try {
+        const snap = await db.ref("logs").once("value");
+        const rows = [];
+        const seen = new Set();
 
-    snap.forEach(child => {
-      const data = child.val();
-      if (data && data.username && data.amount) {
-        rows.push({ key: child.key, ...data });
+        snap.forEach(child => {
+          const key = String(child.key || "").trim();
+          if (!key || seen.has(key)) return;
+          seen.add(key);
+          const data = child.val();
+          if (data && data.username && data.amount) {
+            rows.push({ key, ...data });
+          }
+        });
+
+        const grouped = new Map();
+        rows.forEach(log => {
+          const rawUsername = String(safe(log, "username", "-")).trim();
+          const usernameKey = normalizeKey(rawUsername);
+          const amount = Number(safe(log, "amount", 0));
+          const timestamp = Number(log.timestamp || 0);
+          if (!grouped.has(usernameKey)) {
+            grouped.set(usernameKey, { ...log, username: rawUsername, amount, timestamp, count: 1 });
+          } else {
+            const existing = grouped.get(usernameKey);
+            existing.amount += amount;
+            existing.count += 1;
+            if (timestamp > (existing.timestamp || 0)) {
+              existing.timestamp = timestamp;
+              existing.key = log.key;
+            }
+          }
+        });
+
+        const aggregateRows = Array.from(grouped.values());
+        let totalAmount = 0;
+        if (aggregateRows.length === 0) {
+          tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Không có lệnh nào.</td></tr>`;
+        } else {
+          aggregateRows.forEach(log => {
+            const username = safe(log, "username", "-");
+            const amount = Number(log.amount || 0);
+            const ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : "-";
+            const countLabel = log.count > 1 ? ` <small style="color:#64748b">(${log.count} lệnh)</small>` : "";
+            totalAmount += amount || 0;
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td>${username}${countLabel}</td>
+              <td class="right">${formatCurrency(amount)}</td>
+              <td>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                  <div>${ts}</div>
+                  <div>
+                    <button class="btn-win btn-mini" data-user="${username}" data-amount="${amount}">Thắng</button>
+                    <button class="btn-lose btn-mini" data-user="${username}" data-logkey="${log.key}">Thua</button>
+                  </div>
+                </div>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        document.getElementById("coinTotalCount").textContent = aggregateRows.length;
+        document.getElementById("coinTotalAmount").textContent = formatCurrency(totalAmount);
+      } catch (err) {
+        console.error("Render coin error:", err);
+        tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Lỗi hiển thị: ${String(err)}</td></tr>`;
       }
-    });
-
-    let totalAmount = 0;
-    if (rows.length === 0) {
-      tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Không có lệnh nào.</td></tr>`;
-    } else {
-      rows.forEach(log => {
-        const username = safe(log, "username", "-");
-        const amount = Number(safe(log, "amount", 0));
-        const ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : "-";
-        totalAmount += amount || 0;
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${username}</td>
-          <td class="right">${formatCurrency(amount)}</td>
-          <td>
-            <div style="display:flex;flex-direction:column;gap:4px;">
-              <div>${ts}</div>
-              <div>
-                <button class="btn-win btn-mini" data-user="${username}" data-amount="${amount}">Thắng</button>
-                <button class="btn-lose btn-mini" data-user="${username}" data-logkey="${log.key}">Thua</button>
-              </div>
-            </div>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
     }
-
-    document.getElementById("coinTotalCount").textContent = rows.length;
-    document.getElementById("coinTotalAmount").textContent = formatCurrency(totalAmount);
-  } catch (err) {
-    console.error("Render coin error:", err);
-    tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Lỗi hiển thị: ${String(err)}</td></tr>`;
-  }
-}
-document.getElementById("coinLogTable").addEventListener("click", async (e) => {
+    document.getElementById("coinLogTable").addEventListener("click", async (e) => {
   const winBtn = e.target.closest(".btn-win");
   const loseBtn = e.target.closest(".btn-lose");
 
@@ -380,14 +499,42 @@ document.getElementById("coinLogTable").addEventListener("click", async (e) => {
     // ===== Render Stock =====
     function renderStockListFromSnap(snap) {
   const tbody = document.getElementById("stockLogTable");
+  tbody.innerHTML = "";
   try {
     const rows = [];
+    const seen = new Set();
     const data = snap.val() || {};
-    for (const key in data) {
-      if (data.hasOwnProperty(key)) {
-        rows.push({ key, ...data[key] });
-      }
+    for (const rawKey in data) {
+      if (!Object.prototype.hasOwnProperty.call(data, rawKey)) continue;
+      const key = String(rawKey || "").trim();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      rows.push({ key, ...data[rawKey] });
     }
+
+    const grouped = new Map();
+    rows.forEach(log => {
+      const rawUsername = String(safe(log, "username", "-"))?.trim();
+      const usernameKey = normalizeKey(rawUsername);
+      const amount = Number(safe(log, "amount", 0));
+      const timestamp = Number(log.timestamp || 0);
+      if (!grouped.has(usernameKey)) {
+        grouped.set(usernameKey, { ...log, username: rawUsername, amount, timestamp, count: 1 });
+      } else {
+        const existing = grouped.get(usernameKey);
+        existing.amount += amount;
+        existing.count += 1;
+        if (timestamp > (existing.timestamp || 0)) {
+          existing.timestamp = timestamp;
+          existing.key = log.key;
+          existing.winRate = log.winRate;
+          existing.finalBar = log.finalBar;
+          existing.result = log.result;
+        }
+      }
+    });
+
+    const aggregateRows = Array.from(grouped.values());
 
     function getTimeSafe(log) {
       try {
@@ -397,14 +544,14 @@ document.getElementById("coinLogTable").addEventListener("click", async (e) => {
       }
     }
 
-    rows.sort((a, b) => getTimeSafe(b) - getTimeSafe(a));
+    aggregateRows.sort((a, b) => getTimeSafe(b) - getTimeSafe(a));
 
     let totalAmount = 0;
-    if (rows.length === 0) {
+    if (aggregateRows.length === 0) {
       tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Không có lệnh nào.</td></tr>`;
     } else {
       tbody.innerHTML = "";
-      rows.forEach(log => {
+      aggregateRows.forEach(log => {
         const username = safe(log, "username", "-");
         const amount = Number(safe(log, "amount", 0));
         const winRate = safe(log, "winRate", "-");
@@ -431,7 +578,7 @@ document.getElementById("coinLogTable").addEventListener("click", async (e) => {
       });
     }
 
-    document.getElementById("stockTotalCount").textContent = rows.length;
+    document.getElementById("stockTotalCount").textContent = aggregateRows.length;
     document.getElementById("stockTotalAmount").textContent = formatCurrency(totalAmount);
   } catch (err) {
     console.error("Render stock error:", err);
@@ -483,14 +630,16 @@ document.getElementById("coinLogTable").addEventListener("click", async (e) => {
       tbody.innerHTML = "";
       try {
         const snap = await db.ref("users").once("value");
-        const rows = [];
+        const usersMap = new Map();
         snap.forEach(child => {
-          const key = child.key;
+          const key = String(child.key || "").trim();
+          if (!key || usersMap.has(key)) return;
           const val = child.val() || {};
-          const name = val.username || key;
+          const name = String(val.username || key).trim();
           const balance = Number(val.balance || 0);
-        rows.push({ key, name, balance });
+          usersMap.set(key, { key, name, balance });
         });
+        const rows = Array.from(usersMap.values());
         const filtered = rows.filter(r =>
           r.key.toLowerCase().includes(search) || (r.name + "").toLowerCase().includes(search)
         );
@@ -526,6 +675,7 @@ document.getElementById("coinLogTable").addEventListener("click", async (e) => {
     async function deleteUserAndData(userKey) {
       const updates = {};
       updates[`users/${userKey}`] = null;
+      updates[`loans/${userKey}`] = null;
 
       const coinSnap = await db.ref("logs").once("value");
       coinSnap.forEach(child => {
@@ -543,6 +693,14 @@ document.getElementById("coinLogTable").addEventListener("click", async (e) => {
       transferSnap.forEach(child => {
         const v = child.val() || {};
         if (v.from === userKey || v.to === userKey) updates[`transfers/${child.key}`] = null;
+      });
+
+      const receiptSnap = await db.ref("receipts").once("value");
+      receiptSnap.forEach(child => {
+        const v = child.val() || {};
+        if (v.target === 'all' || (v.users || []).includes(userKey)) {
+          updates[`receipts/${child.key}`] = null;
+        }
       });
 
       await db.ref().update(updates);
@@ -571,6 +729,7 @@ document.getElementById("coinLogTable").addEventListener("click", async (e) => {
           });
           input.value = "";
           renderUsersList();
+          renderReceiptUsers();
         } catch (err) { alert("❌ Lỗi cập nhật: " + err.message); }
       }
 
@@ -585,6 +744,7 @@ document.getElementById("coinLogTable").addEventListener("click", async (e) => {
             return next < 0 ? 0 : Math.round(next);
           });
           renderUsersList();
+          renderReceiptUsers();
         } catch (err) { alert("❌ Lỗi cập nhật: " + err.message); }
       }
 
@@ -600,6 +760,8 @@ document.getElementById("coinLogTable").addEventListener("click", async (e) => {
           await deleteUserAndData(userKey);
           alert(`✅ Đã xóa tài khoản và dữ liệu liên quan của "${userKey}".`);
           renderUsersList();
+          renderReceiptUsers();
+          renderLoanReminders();
         } catch (err) {
           console.error(err);
           alert("❌ Lỗi khi xóa: " + err.message);
@@ -610,11 +772,251 @@ document.getElementById("coinLogTable").addEventListener("click", async (e) => {
       }
     });
 
+    window.receiptSelectedUsers = new Set();
+    function updateReceiptSelectionChips() {
+      const chips = document.getElementById('receiptSelectedChips');
+      if (!chips) return;
+      chips.innerHTML = '';
+      Array.from(window.receiptSelectedUsers).forEach(id => {
+        const chip = document.createElement('span');
+        chip.textContent = id;
+        chip.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#eff6ff;color:#0f172a;font-size:12px;cursor:pointer;';
+        chip.title = 'Nhấn để bỏ chọn';
+        chip.onclick = () => { window.receiptSelectedUsers.delete(id); renderReceiptUsers(); };
+        chips.appendChild(chip);
+      });
+    }
+
+    async function renderReceiptUsers() {
+      const container = document.getElementById('receiptUserList');
+      if (!container) return;
+      const search = (document.getElementById('receiptUserSearch')?.value || '').trim().toLowerCase();
+      const snap = await db.ref('users').once('value');
+      const usersMap = new Map();
+      snap.forEach(child => {
+        const key = String(child.key || "").trim();
+        if (!key || usersMap.has(key)) return;
+        const val = child.val() || {};
+        const name = String(val.username || key).trim();
+        if (search && !(`${name} ${key}`.toLowerCase().includes(search))) return;
+        usersMap.set(key, { key, name });
+      });
+      const users = Array.from(usersMap.values());
+      container.innerHTML = '';
+      if (!users.length) {
+        container.innerHTML = '<div class="row-empty" style="padding:12px;">Không tìm thấy người dùng.</div>';
+        updateReceiptSelectionChips();
+        return;
+      }
+      users.sort((a,b) => a.name.localeCompare(b.name));
+      users.forEach(user => {
+        const row = document.createElement('div');
+        const selected = window.receiptSelectedUsers.has(user.key);
+        row.style.cssText = `padding:10px 12px; margin-bottom:6px; border-radius:12px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; border:1px solid ${selected ? '#0369a1' : '#e2e8f0'}; background:${selected ? '#e0f2fe' : '#fff'};`;
+        row.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:50%;background:#c7d2fe;color:#1d4ed8;display:flex;align-items:center;justify-content:center;font-weight:700;">${(user.name || '?').charAt(0).toUpperCase()}</span><div><div style="font-weight:600;color:#0f172a;">${user.name}</div><div style="font-size:12px;color:#64748b;">${user.key}</div></div></div><span style="font-size:12px;color:${selected ? '#0369a1' : '#64748b'};">${selected ? 'Đã chọn' : 'Chọn'}</span>`;
+        row.onclick = () => {
+          if (window.receiptSelectedUsers.has(user.key)) {
+            window.receiptSelectedUsers.delete(user.key);
+          } else {
+            window.receiptSelectedUsers.add(user.key);
+          }
+          renderReceiptUsers();
+        };
+        container.appendChild(row);
+      });
+      updateReceiptSelectionChips();
+    }
+
+    async function createReceipt(forAll = false) {
+      const title = (document.getElementById('receiptTitle').value || '').trim();
+      if (!title) return alert('Vui lòng nhập tiêu đề biên lai.');
+      const amount = parseInt(document.getElementById('receiptAmount').value);
+      if (isNaN(amount) || amount <= 0) return alert('Vui lòng nhập số tiền biên lai hợp lệ.');
+      if (amount > 100000000) return alert('Số tiền không vượt quá 100,000,000₫.');
+
+      const note = (document.getElementById('receiptNote').value || '').trim();
+      const selectedIds = Array.from(window.receiptSelectedUsers);
+      if (!forAll && selectedIds.length === 0) return alert('Hãy chọn tối thiểu một người dùng.');
+
+      const receiptId = db.ref('receipts').push().key;
+      const receipt = {
+        title,
+        amount,
+        note,
+        target: forAll ? 'all' : 'selected',
+        users: forAll ? [] : selectedIds,
+        createdAt: Date.now(),
+        createdBy: 'manager',
+        status: 'pending'
+      };
+
+      await db.ref(`receipts/${receiptId}`).set(receipt);
+      alert('Đã tạo biên lai. Bạn có thể bấm Thông báo để gửi tới user.');
+      if (!forAll) window.receiptSelectedUsers.clear();
+      renderReceiptUsers();
+      renderReceipts();
+    }
+
+    async function renderReceipts() {
+      const tbody = document.getElementById('receiptTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+      const snap = await db.ref('receipts').once('value');
+      const receiptMap = new Map();
+      snap.forEach(child => {
+        const key = String(child.key || "").trim();
+        if (!key || receiptMap.has(key)) return;
+        const data = child.val();
+        receiptMap.set(key, { key, ...data });
+      });
+      const rows = Array.from(receiptMap.values());
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td class="row-empty" colspan="8">Chưa có biên lai nào.</td></tr>`;
+        return;
+      }
+
+      rows.sort((a,b) => b.createdAt - a.createdAt);
+      rows.forEach(item => {
+        const tr = document.createElement('tr');
+        const targetLabel = item.target === 'all' ? 'Tất cả' : `${item.users?.length || 0} user`;
+        const time = item.createdAt ? new Date(item.createdAt).toLocaleString() : '-';
+        tr.innerHTML = `
+          <td>${item.key}</td>
+          <td>${item.title || '-'}</td>
+          <td>${item.note || '-'}</td>
+          <td>${targetLabel}</td>
+          <td class="right">${formatCurrency(item.amount)}</td>
+          <td>${item.status || 'pending'}</td>
+          <td>${time}</td>
+          <td class="nowrap">
+            <button class="btn btn-soft btn-notify-receipt" data-id="${item.key}">Thông báo</button>
+            <button class="btn btn-lose btn-delete-receipt" data-id="${item.key}">Xóa</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function deleteReceipt(receiptId) {
+      if (!confirm('Xóa biên lai này?')) return;
+      await db.ref(`receipts/${receiptId}`).remove();
+      renderReceipts();
+    }
+
+    async function writeNotificationToUser(userId, payload) {
+      const ref = db.ref(`notifications/${userId}`).push();
+      await ref.set(payload);
+    }
+
+    async function writeNotificationToAll(payload) {
+      const ref = db.ref('notifications_all').push();
+      await ref.set(payload);
+    }
+
+    async function notifyReceipt(receiptId) {
+      const snap = await db.ref(`receipts/${receiptId}`).once('value');
+      const receipt = snap.val();
+      if (!receipt) return alert('Biên lai không tồn tại.');
+      const message = `Bạn có biên lai cần trả ${formatCurrency(receipt.amount)}${receipt.note ? ' - ' + receipt.note : ''}`;
+      const payload = { type: 'receipt', receiptId, message, createdAt: Date.now() };
+      if (receipt.target === 'all') {
+        await writeNotificationToAll(payload);
+      } else {
+        const users = receipt.users || [];
+        await Promise.all(users.map(uid => writeNotificationToUser(uid, payload)));
+      }
+      await db.ref(`receipts/${receiptId}/notifiedAt`).set(Date.now());
+      alert('Đã gửi thông báo biên lai.');
+      renderReceipts();
+    }
+
+    async function renderLoanReminders() {
+      const tbody = document.getElementById('loanReminderTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const [loanSnap, usersSnap] = await Promise.all([db.ref('loans').once('value'), db.ref('users').once('value')]);
+      const userMap = {};
+      usersSnap.forEach(child => { const val = child.val() || {}; userMap[child.key] = val.username || child.key; });
+
+      const loanMap = new Map();
+      loanSnap.forEach(child => {
+        const key = String(child.key || "").trim();
+        if (!key || loanMap.has(key)) return;
+        const data = child.val();
+        if (data && data.amount) loanMap.set(key, { userId: key, ...data });
+      });
+      const rows = Array.from(loanMap.values());
+
+      if (!rows.length) {
+        tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Không có khoản vay nào trong hệ thống.</td></tr>`;
+        return;
+      }
+
+      rows.sort((a,b) => (b.start || 0) - (a.start || 0));
+      rows.forEach(item => {
+        const name = userMap[item.userId] || '-';
+        const status = item.status || 'active';
+        const statusLabel = status === 'active' ? 'Đang vay' : status;
+        const time = item.start ? new Date(item.start).toLocaleString() : '-';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${item.userId}</td>
+          <td>${name}</td>
+          <td class="right">${formatCurrency(item.amount)}</td>
+          <td>${statusLabel}</td>
+          <td>${time}</td>
+          <td class="nowrap">
+            <button class="btn btn-primary btn-notify-loan" data-user="${item.userId}">Nhắc</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function notifyLoanReminder(userId) {
+      const snap = await db.ref(`loans/${userId}`).once('value');
+      const loan = snap.val();
+      if (!loan || !loan.amount) return alert('Không tìm thấy khoản vay của user.');
+      const message = `Nhắc nợ: bạn đang vay ${formatCurrency(loan.amount)}. Vui lòng trả sớm để tránh khóa tài khoản.`;
+      await writeNotificationToUser(userId, { type: 'loan_reminder', message, createdAt: Date.now() });
+      alert(`Đã gửi nhắc nợ đến ${userId}.`);
+    }
+
+    async function notifyLoanReminderAll() {
+      const snap = await db.ref('loans').once('value');
+      if (!snap.exists()) return alert('Không có khoản vay nào để nhắc.');
+      const payload = { type: 'loan_reminder_all', message: 'Nhắc nợ: bạn có khoản vay cần xử lý. Vui lòng kiểm tra.', createdAt: Date.now() };
+      await writeNotificationToAll(payload);
+      alert('Đã gửi nhắc nợ cho tất cả user.');
+    }
+
+    document.getElementById('receiptTableBody').addEventListener('click', async (e) => {
+      const notifyBtn = e.target.closest('.btn-notify-receipt');
+      const deleteBtn = e.target.closest('.btn-delete-receipt');
+      if (notifyBtn) {
+        await notifyReceipt(notifyBtn.dataset.id);
+      }
+      if (deleteBtn) {
+        await deleteReceipt(deleteBtn.dataset.id);
+      }
+    });
+
+    document.getElementById('loanReminderTableBody').addEventListener('click', async (e) => {
+      const notifyBtn = e.target.closest('.btn-notify-loan');
+      if (notifyBtn) {
+        await notifyLoanReminder(notifyBtn.dataset.user);
+      }
+    });
+
     // ===== Refresh =====
     function refreshAll() {
       renderCoinList();
       renderStockListOnce();
       renderUsersList();
+      renderReceiptUsers();
+      renderReceipts();
+      renderLoanReminders();
     }
 
     // ===== Initial & live =====
@@ -622,6 +1024,8 @@ document.getElementById("coinLogTable").addEventListener("click", async (e) => {
 
     db.ref("logs").on("value", () => { renderCoinList(); });
     db.ref("logs_stock").on("value", (snap) => { renderStockListFromSnap(snap); });
-    db.ref("users").on("value", () => { renderUsersList(); });
+    db.ref("users").on("value", () => { renderUsersList(); renderReceiptUsers(); renderLoanReminders(); });
+    db.ref("receipts").on("value", () => { renderReceipts(); });
+    db.ref("loans").on("value", () => { renderLoanReminders(); });
   </script>
 </body>

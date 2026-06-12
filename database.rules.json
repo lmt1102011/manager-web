@@ -1,0 +1,42 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "users": {
+      ".read": true,
+      ".write": true
+    },
+    "logs_coin": {
+      ".read": true,
+      ".write": true
+    },
+    "logs_stock": {
+      ".read": true,
+      ".write": true
+    },
+    "loans": {
+      ".read": true,
+      ".write": true
+    },
+    "receipts": {
+      ".read": true,
+      ".write": true
+    },
+    "notifications": {
+      ".read": true,
+      ".write": true
+    },
+    "notifications_all": {
+      ".read": true,
+      ".write": true
+    },
+    "market": {
+      ".read": true,
+      ".write": true
+    },
+    "win_rate": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

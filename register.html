@@ -4,60 +4,52 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>Đăng ký</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
-    body { background: #f4f6f8; min-height: 100vh; display: grid; place-items: center; padding: 20px; }
-    .card {
-      width: 100%; max-width: 480px; background: white; padding: 24px; border-radius: 14px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.06); border: 1px solid #eef2f7;
-    }
-    h1 { font-size: 22px; color: #1f66cc; margin-bottom: 14px; }
-    p { color: #555; margin-bottom: 16px; }
-    label { display: block; font-weight: 600; color: #333; margin: 10px 0 8px; }
-    input[type="text"], input[type="password"] {
-      width: 100%; padding: 10px 12px; border: 1px solid #d9e2ec; border-radius: 10px; font-size: 15px;
-      outline: none; transition: border 0.2s;
-    }
-    input[type="text"]:focus, input[type="password"]:focus { border-color: #1f66cc; }
-    .row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
-    .row label.inline { display: flex; align-items: center; gap: 8px; font-weight: 500; color: #333; }
-    button {
-      width: 100%; margin-top: 14px; padding: 12px 16px; background: #1f66cc; border: none; border-radius: 10px;
-      color: white; font-weight: 700; cursor: pointer; transition: background 0.25s;
-    }
-    button:hover { background: #1554a8; }
-    .error { color: #e74c3c; font-weight: 600; margin-top: 10px; }
-    .success { color: #1f8b24; font-weight: 600; margin-top: 10px; }
-    .footer { margin-top: 18px; font-size: 13px; color: #6b7280; text-align: center; }
-    a { color: #1f66cc; text-decoration: none; }
-    a:hover { text-decoration: underline; }
+    html,body { height: 100%; }
+    body { font-family: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, 'Helvetica Neue', Arial; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Đăng ký</h1>
-    <p>Tạo tài khoản mới bằng tên người dùng và mật khẩu.</p>
+  <div class="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-6">
+    <div class="w-full max-w-md">
+      <div class="text-center mb-8">
+        <h1 class="text-2xl font-bold text-sky-700">Đăng ký</h1>
+        <p class="text-sm text-slate-500 mt-2">Tạo tài khoản mới bằng tên người dùng và mật khẩu.</p>
+      </div>
 
-    <label for="username">Tên người dùng</label>
-    <input type="text" id="username" placeholder="3–20 ký tự: a-z, 0-9, _ . -" autocomplete="username" />
+      <div class="bg-white shadow-lg border border-slate-100 rounded-2xl p-6">
+        <div class="space-y-4">
+          <div>
+            <label for="username" class="block text-sm font-semibold text-slate-700 mb-2">Tên người dùng</label>
+            <input type="text" id="username" placeholder="3–20 ký tự: a-z, 0-9, _ . -" autocomplete="username" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-200" />
+          </div>
 
-    <label for="password">Mật khẩu</label>
-    <input type="password" id="password" placeholder="Ít nhất 8 ký tự" autocomplete="new-password" />
+          <div>
+            <label for="password" class="block text-sm font-semibold text-slate-700 mb-2">Mật khẩu</label>
+            <input type="password" id="password" placeholder="Ít nhất 8 ký tự" autocomplete="new-password" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-200" />
+          </div>
 
-    <label for="password2">Nhập lại mật khẩu</label>
-    <input type="password" id="password2" placeholder="Nhập lại mật khẩu" autocomplete="new-password" />
+          <div>
+            <label for="password2" class="block text-sm font-semibold text-slate-700 mb-2">Nhập lại mật khẩu</label>
+            <input type="password" id="password2" placeholder="Nhập lại mật khẩu" autocomplete="new-password" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-200" />
+          </div>
 
-    <div class="row">
-      <label class="inline">
-        <input type="checkbox" id="rememberMe" checked />
-        Ghi nhớ đăng nhập (7 ngày)
-      </label>
+          <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" id="rememberMe" checked class="w-4 h-4 rounded border-slate-300" />
+            <span>Ghi nhớ đăng nhập (7 ngày)</span>
+          </label>
+
+          <button id="registerBtn" class="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-semibold px-4 py-3">Tạo tài khoản</button>
+
+          <div id="msg" class="min-h-[1.25rem] text-sm"></div>
+        </div>
+
+        <div class="mt-6 text-center text-sm text-slate-500">Đã có tài khoản? <a href="index.html" class="text-sky-600 font-semibold">Đăng nhập</a></div>
+      </div>
     </div>
-
-    <button id="registerBtn">Tạo tài khoản</button>
-    <div id="msg"></div>
-    <div class="footer">Đã có tài khoản? <a href="index.html">Đăng nhập</a></div>
   </div>
 
   <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-app-compat.js"></script>
@@ -197,7 +189,7 @@
         setSession(username, days);
         msgEl.textContent = "Tạo tài khoản thành công. Đang chuyển...";
         msgEl.className = "success";
-        setTimeout(() => { location.href = "dashboard.html"; }, 400);
+        setTimeout(() => { location.href = "index.html"; }, 400);
       } catch (err) {
         console.error('Register error:', err);
         // Handle Firebase permission errors separately so user sees actionable guidance
