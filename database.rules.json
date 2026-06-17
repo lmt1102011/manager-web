@@ -1,40 +1,67 @@
 {
   "rules": {
     ".read": true,
-    ".write": true,
+    ".write": false,
+
     "users": {
       ".read": true,
-      ".write": true
+      ".write": true,
+      ".indexOn": ["username"],
+      "$username": {
+        ".validate": "newData.hasChildren(['username','createdAt']) && newData.child('username').isString() && newData.child('createdAt').isString()"
+      }
     },
-    "logs_coin": {
+
+    "products": {
+      ".read": true,
+      ".write": true,
+      ".indexOn": ["category","createdAt"],
+      "$pid": {
+        ".validate": "newData.hasChildren(['title','price']) && newData.child('title').isString() && newData.child('price').isNumber()"
+      }
+    },
+
+    "inventory": {
       ".read": true,
       ".write": true
     },
-    "logs_stock": {
-      ".read": true,
-      ".write": true
-    },
-    "loans": {
-      ".read": true,
-      ".write": true
-    },
+
     "receipts": {
       ".read": true,
       ".write": true
     },
+
     "notifications": {
       ".read": true,
       ".write": true
     },
+
     "notifications_all": {
       ".read": true,
       ".write": true
     },
-    "market": {
+
+    "config": {
       ".read": true,
       ".write": true
     },
-    "win_rate": {
+
+    "market_coin": {
+      ".read": true,
+      ".write": true
+    },
+
+    "market_stock": {
+      ".read": true,
+      ".write": true
+    },
+
+    "coin": {
+      ".read": true,
+      ".write": true
+    },
+
+    "stock": {
       ".read": true,
       ".write": true
     }

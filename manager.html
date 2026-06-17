@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-  <title>Manager — Coin & Chứng khoán</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <title>Manager — Hệ thống quản trị</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
   <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-database-compat.js"></script>
   <style>
@@ -12,11 +13,12 @@
       --primary: #1f66cc; --bg: #f7f9fc; --card: #ffffff; --muted: #6b7280;
       --chip-bg: #eaf4ff; --chip-bd: #d8e8ff; --thead: #eaf4ff; --border: #eee;
       --success: #28a745; --danger: #dc3545; --btn: #0078d4; --warn: #f59e0b;
+      --text: #111827;
     }
     * { box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: var(--bg); padding: 24px; color: #111827; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); padding: 24px; color: var(--text); margin: 0; }
     header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-    h1 { font-size: 22px; color: var(--primary); }
+    h1 { font-size: 22px; color: var(--primary); margin:0; display: flex; align-items: center; gap: 8px;}
     .status { font-weight: 600; color: var(--primary); }
     .header-actions { display:flex; align-items:center; gap:8px; }
     .btn { padding: 8px 14px; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; transition: opacity .2s ease; text-decoration:none; display:inline-block; }
@@ -24,7 +26,7 @@
     .btn-primary { background: var(--btn); color: #fff; }
     .btn-soft { background: #eef4ff; color: #0f3e9e; border: 1px solid #d8e8ff; }
     .tabs { display: flex; gap: 8px; margin: 14px 0 18px; flex-wrap: wrap; }
-    .tab-btn { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--chip-bd); background: var(--chip-bg); color: var(--primary); font-weight: 600; cursor: pointer; }
+    .tab-btn { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--chip-bd); background: var(--chip-bg); color: var(--primary); font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;}
     .tab-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
     .card { background: var(--card); border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 16px; margin-bottom: 20px; }
     .summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
@@ -33,9 +35,10 @@
     th, td { padding: 12px 16px; border-bottom: 1px solid var(--border); text-align: left; font-size: 14px; }
     th { background: var(--thead); color: #333; }
     .right { text-align: right; }
+    .center { text-align: center; }
     .muted { color: var(--muted); font-size: 13px; }
     .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
-    button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; transition: opacity .2s ease; }
+    button { padding: 10px 16px; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; transition: opacity .2s ease; display: inline-flex; align-items: center; gap: 6px;}
     button:hover { opacity: 0.9; }
     .btn-win { background: var(--success); color: #fff; }
     .btn-lose { background: var(--danger); color: #fff; }
@@ -43,30 +46,84 @@
     .section { display: none; }
     .section.active { display: block; }
     .row-empty { text-align: center; color: var(--muted); font-style: italic; }
-    .inline-input { padding:10px 12px;border:1px solid var(--chip-bd);border-radius:10px;width:160px; }
+    .inline-input { padding:10px 12px;border:1px solid var(--chip-bd);border-radius:10px;width:100%; max-width: 200px;}
     .input-small { padding:8px 10px;border:1px solid var(--chip-bd);border-radius:8px;width:140px; }
     .nowrap { white-space: nowrap; }
+
+    /* =======================================================
+       EFFECT BUILDER MODAL STYLES (FULL SCREEN)
+       ======================================================= */
+    #effectBuilderModal {
+        display: none; position: fixed; inset: 0; background: #f0f2f5; z-index: 1000; overflow: hidden;
+        flex-direction: column;
+    }
+    .eb-header {
+        background: #fff; padding: 16px 24px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .eb-content { display: flex; flex: 1; overflow: hidden; }
+    .eb-form-area { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; }
+    .eb-preview-area { width: 380px; background: #fff; border-left: 1px solid #ddd; padding: 24px; overflow-y: auto; box-shadow: -4px 0 15px rgba(0,0,0,0.02); display: flex; flex-direction: column; align-items: center; }
+    .eb-card { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); }
+    .eb-card h3 { margin-top: 0; margin-bottom: 16px; font-size: 16px; color: #111; display: flex; align-items: center; gap: 8px;}
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: #555; margin-bottom: 6px; }
+    .form-control { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 8px; font-family: 'Inter', sans-serif; font-size: 14px;}
+    .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(31, 102, 204, 0.1); }
+    .form-row { display: flex; gap: 16px; }
+    .form-row > * { flex: 1; }
+
+    /* Icons Grid Picker */
+    .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 8px; max-height: 150px; overflow-y: auto; padding: 8px; border: 1px solid #eee; border-radius: 8px; background: #fafafa;}
+    .icon-item { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-size: 24px; color: #666; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+    .icon-item:hover { background: #eee; }
+    .icon-item.selected { background: var(--primary); color: #fff; }
+
+    /* Effect Row */
+    .effect-row { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid #eee; border-radius: 8px; background: #fdfdfd; margin-bottom: 10px; position: relative; flex-wrap: wrap;}
+    .effect-row select, .effect-row input { padding: 8px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; width: 100%;}
+    .remove-effect { background: #fee2e2; color: #ef4444; width: 34px; height: 34px; border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; padding: 0;}
+
+    /* Live Preview Card */
+    .preview-product { width: 100%; background: #fff; border: 1px solid #eee; border-radius: 20px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); position: relative;}
+    .preview-badge { position: absolute; top: 0; right: 0; font-size: 10px; font-weight: bold; padding: 4px 12px; border-bottom-left-radius: 12px; border-top-right-radius: 20px; text-transform: uppercase; color: #fff;}
+    .preview-icon-box { width: 48px; height: 48px; border-radius: 12px; background: #eef4ff; color: var(--primary); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 16px; border: 1px solid #d8e8ff;}
+    .preview-title { font-weight: 700; font-size: 18px; margin: 0 0 4px 0;}
+    .preview-cat { font-size: 11px; color: #888; text-transform: uppercase; font-weight: bold; margin-bottom: 8px;}
+    .preview-desc { font-size: 13px; color: #666; line-height: 1.5; margin-bottom: 16px; min-height: 40px;}
+    .preview-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .preview-meta-chip { font-size: 10px; font-weight: bold; padding: 4px 8px; border-radius: 6px; background: #f1f5f9; color: #475569; }
+    .preview-btn { width: 100%; background: var(--primary); color: #fff; text-align: center; padding: 12px; border-radius: 10px; font-weight: bold;}
+    .preview-effect-list { margin-top: 16px; border-top: 1px dashed #eee; padding-top: 16px; }
+    .preview-effect-item { font-size: 12px; color: #444; display: flex; align-items: center; gap: 6px; margin-bottom: 8px;}
+
+    .switch-container { display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+    .switch-input { display: none; }
+    .switch-bg { width: 40px; height: 22px; background: #ccc; border-radius: 22px; position: relative; transition: 0.3s;}
+    .switch-input:checked + .switch-bg { background: var(--success); }
+    .switch-handle { width: 18px; height: 18px; background: #fff; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);}
+    .switch-input:checked + .switch-bg .switch-handle { transform: translateX(18px); }
+
   </style>
 </head>
 <body>
   <header>
-    <h1>📋 Manager — Coin & Chứng khoán</h1>
+    <h1><i class="ph-fill ph-shield-check"></i> Mtrix Enterprise Manager</h1>
     <div class="header-actions">
       <div class="status">
         <div>Coin: <span id="marketStatusCoin">Đang tải...</span></div>
         <div>CK: <span id="marketStatusStock">Đang tải...</span></div>
       </div>
-
-      <a href="index.html" id="logoutBtn" class="btn btn-soft">Đăng xuất</a>
+      <a href="index.html" id="logoutBtn" class="btn btn-soft"><i class="ph-bold ph-sign-out"></i> Đăng xuất</a>
     </div>
   </header>
 
   <div class="tabs">
-    <button class="tab-btn active" data-target="coinSection">💰 Coin</button>
-    <button class="tab-btn" data-target="stockSection">📈 Chứng khoán</button>
-    <button class="tab-btn" data-target="usersSection">👤 Người dùng</button>
-    <button class="tab-btn" data-target="receiptsSection">🧾 Biên Lai</button>
-    <button class="tab-btn" data-target="loanNoticeSection">🔔 Nhắc Nợ</button>
+    <button class="tab-btn active" data-target="marketplaceSection"><i class="ph-bold ph-storefront"></i> Marketplace & Effect</button>
+    <button class="tab-btn" data-target="coinSection"><i class="ph-bold ph-currency-circle-dollar"></i> Coin</button>
+    <button class="tab-btn" data-target="stockSection"><i class="ph-bold ph-chart-line-up"></i> Chứng khoán</button>
+    <button class="tab-btn" data-target="usersSection"><i class="ph-bold ph-users"></i> Người dùng</button>
+    <button class="tab-btn" data-target="receiptsSection"><i class="ph-bold ph-receipt"></i> Biên Lai</button>
+    <button class="tab-btn" data-target="loanNoticeSection"><i class="ph-bold ph-bell"></i> Nhắc Nợ</button>
   </div>
 
   <div class="card">
@@ -76,22 +133,44 @@
       <button class="btn-primary" onclick="setMarketStatus('stock', 'open')">🟢 Mở sàn CK</button>
       <button class="btn-primary" onclick="setMarketStatus('stock', 'closed')">🔴 Đóng sàn CK</button>
 
-      <button class="btn-primary" onclick="refreshAll()">🔄 Làm mới</button>
+      <button class="btn-primary" onclick="refreshAll()"><i class="ph-bold ph-arrows-clockwise"></i> Làm mới toàn bộ</button>
     </div>
-
     <div class="actions" style="margin-top:10px; gap:8px;">
-      <input id="winRateInput" type="number" min="0" max="100" step="1" placeholder="Tỉ lệ trúng (%)" class="inline-input">
+      <input id="winRateInput" type="number" min="0" max="100" step="1" placeholder="Tỉ lệ trúng CK (%)" class="inline-input">
       <button class="btn-primary" onclick="saveWinRate()">💾 Lưu tỉ lệ chứng khoán</button>
       <span id="currentWinRateLabel" class="muted"></span>
     </div>
-
-    <p class="muted" style="margin-top:8px">
-      * Đang dùng <code>market/status</code> chung cho cả hai trò. Có thể tách thành <code>market_coin/status</code> và <code>market_stock/status</code> nếu cần.
-    </p>
   </div>
 
+  <!-- MARKETPLACE & EFFECT ENGINE SECTION -->
+  <section id="marketplaceSection" class="section active">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+        <h2>🛒 Quản lý Sản phẩm, VIP & Vật phẩm</h2>
+        <button class="btn-primary" onclick="openEffectBuilder()"><i class="ph-bold ph-plus"></i> Tạo Sản Phẩm Mới</button>
+      </div>
+      
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Sản phẩm / Vật phẩm</th>
+            <th>Loại/Thuộc tính</th>
+            <th class="right">Giá (₫)</th>
+            <th class="center">Hiệu ứng</th>
+            <th class="center">Trạng thái</th>
+            <th class="right">Hành động</th>
+          </tr>
+        </thead>
+        <tbody id="mkTableBody">
+          <tr><td class="row-empty" colspan="7">Đang tải Marketplace...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <!-- COIN SECTION -->
-  <section id="coinSection" class="section active">
+  <section id="coinSection" class="section">
     <div class="card">
       <h2>💰 Danh sách đặt Coin</h2>
       <div class="summary">
@@ -127,7 +206,7 @@
             <th>Tên người dùng</th>
             <th class="right">Số tiền</th>
             <th>Tỉ lệ trúng đặt</th>
-            <th>Vị trí thanh (0–100)</th>
+            <th>Vị trí thanh</th>
             <th>Kết quả tạm</th>
             <th>Thời gian</th>
           </tr>
@@ -136,12 +215,9 @@
           <tr><td class="row-empty" colspan="6">Đang tải...</td></tr>
         </tbody>
       </table>
-
-      <!-- Nút reset tổng tiền CK -->
       <div class="actions">
         <button class="btn-warn" onclick="resetStockTotal()">♻️ Reset tổng tiền (xoá tất cả lệnh CK)</button>
       </div>
-      <p class="muted">* Nút này chỉ xoá lịch sử lệnh chứng khoán (<code>logs_stock</code>) để tổng tiền về 0 ₫. Không ảnh hưởng số dư người dùng.</p>
     </div>
   </section>
 
@@ -167,10 +243,6 @@
           <tr><td class="row-empty" colspan="5">Đang tải...</td></tr>
         </tbody>
       </table>
-      <p class="muted" style="margin-top:8px">
-        * Ví dụ: nhập <b>-1000</b> để trừ 1.000; nhập <b>1000</b> để cộng 1.000. Số dư không âm.<br/>
-        * Nút <b>🗑️ Xóa</b> sẽ xóa tài khoản và các dữ liệu liên quan (log Coin, log Chứng khoán, transfers).
-      </p>
     </div>
   </section>
 
@@ -181,50 +253,45 @@
       <p class="muted">Tạo biên lai trả nợ cho người dùng hoặc gửi cho tất cả.</p>
       <div class="actions" style="gap:12px; margin-bottom:16px; flex-wrap:wrap;">
         <div style="flex:1; min-width:260px;">
-          <label class="block text-sm font-semibold text-slate-700 mb-2">Tìm người dùng</label>
-          <input id="receiptUserSearch" type="text" class="inline-input" placeholder="Tìm theo tên hoặc UID" oninput="renderReceiptUsers()" />
+          <label class="block font-semibold mb-2 text-sm">Tìm người dùng</label>
+          <input id="receiptUserSearch" type="text" class="inline-input" placeholder="Tìm theo tên hoặc UID" oninput="renderReceiptUsers()" style="width:100%; max-width:none;" />
           <div id="receiptUserList" style="margin-top:12px; max-height:240px; overflow:auto; border:1px solid #d8e8ff; border-radius:12px; background:#fff; padding:8px;"></div>
           <div id="receiptSelectedChips" style="margin-top:10px; display:flex; flex-wrap:wrap; gap:6px;"></div>
-          <div class="muted" style="margin-top:6px;">Chọn trực tiếp từng người. Nhấn lại để bỏ chọn. Bấm "Tạo cho tất cả" nếu muốn gửi cho toàn bộ.</div>
         </div>
         <div style="flex:1; min-width:220px;">
-          <label class="block text-sm font-semibold text-slate-700 mb-2">Tiêu đề</label>
-          <input type="text" id="receiptTitle" class="inline-input" placeholder="Tiêu đề biên lai" />
-        </div>
-        <div style="flex:1; min-width:220px;">
-          <label class="block text-sm font-semibold text-slate-700 mb-2">Số tiền biên lai (₫)</label>
-          <input type="number" id="receiptAmount" class="inline-input" placeholder="Nhập số tiền" />
-        </div>
-        <div style="flex:1; min-width:220px;">
-          <label class="block text-sm font-semibold text-slate-700 mb-2">Ghi chú</label>
-          <input type="text" id="receiptNote" class="inline-input" placeholder="Nội dung biên lai" />
-        </div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end;">
-          <button class="btn-primary" onclick="createReceipt(false)">Tạo cho người chọn</button>
-          <button class="btn-primary" onclick="createReceipt(true)">Tạo cho tất cả</button>
+          <label class="block font-semibold mb-2 text-sm">Tiêu đề</label>
+          <input type="text" id="receiptTitle" class="inline-input" placeholder="Tiêu đề biên lai" style="width:100%; max-width:none;" />
+          <br><br>
+          <label class="block font-semibold mb-2 text-sm">Số tiền biên lai (₫)</label>
+          <input type="number" id="receiptAmount" class="inline-input" placeholder="Nhập số tiền" style="width:100%; max-width:none;" />
+          <br><br>
+          <label class="block font-semibold mb-2 text-sm">Ghi chú</label>
+          <input type="text" id="receiptNote" class="inline-input" placeholder="Nội dung biên lai" style="width:100%; max-width:none;" />
         </div>
       </div>
-      <div class="card" style="padding:0;">
-        <div style="padding:16px; border-bottom:1px solid #eee;"><strong>Danh sách biên lai</strong></div>
-        <div style="overflow-x:auto;">
-          <table style="margin:0; width:100%; border-collapse:collapse;">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Tiêu đề</th>
-                <th>Ghi chú</th>
-                <th>Người dùng</th>
-                <th class="right">Số tiền</th>
-                <th>Loại</th>
-                <th>Thời gian</th>
-                <th class="nowrap">Hành động</th>
-              </tr>
-            </thead>
-            <tbody id="receiptTableBody">
-              <tr><td class="row-empty" colspan="7">Đang tải...</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <div style="display:flex; gap:8px; margin-bottom: 20px;">
+        <button class="btn-primary" onclick="createReceipt(false)">Tạo cho người chọn</button>
+        <button class="btn-primary" onclick="createReceipt(true)">Tạo cho tất cả</button>
+      </div>
+
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Tiêu đề</th>
+              <th>Ghi chú</th>
+              <th>Người dùng</th>
+              <th class="right">Số tiền</th>
+              <th>Trạng thái</th>
+              <th>Thời gian</th>
+              <th class="nowrap">Hành động</th>
+            </tr>
+          </thead>
+          <tbody id="receiptTableBody">
+            <tr><td class="row-empty" colspan="8">Đang tải...</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </section>
@@ -233,7 +300,6 @@
   <section id="loanNoticeSection" class="section">
     <div class="card">
       <h2>🔔 Nhắc Nợ</h2>
-      <p class="muted">Xem khoản vay mỗi người và gửi nhắc nợ riêng hoặc tất cả.</p>
       <div class="actions" style="gap:12px; margin-bottom:16px;">
         <button class="btn-soft" onclick="renderLoanReminders()">🔄 Làm mới</button>
         <button class="btn-primary" onclick="notifyLoanReminderAll()">📣 Nhắc tất cả</button>
@@ -258,6 +324,160 @@
     </div>
   </section>
 
+  <!-- EFFECT BUILDER MODAL (FULL SCREEN) -->
+  <div id="effectBuilderModal">
+      <div class="eb-header">
+          <div>
+              <h2 style="margin:0; font-size:18px; color:var(--primary);"><i class="ph-bold ph-magic-wand"></i> Effect Engine Builder</h2>
+              <span class="muted" id="ebModeText">Tạo sản phẩm mới</span>
+          </div>
+          <div style="display:flex; gap:10px;">
+              <button class="btn-soft" onclick="closeEffectBuilder()">Hủy</button>
+              <button class="btn-primary" onclick="saveProduct()"><i class="ph-bold ph-floppy-disk"></i> Lưu & Xuất bản</button>
+          </div>
+      </div>
+      <div class="eb-content">
+          <!-- Form Area -->
+          <div class="eb-form-area">
+              <input type="hidden" id="eb_prod_id">
+              
+              <div class="eb-card">
+                  <h3><i class="ph-bold ph-info"></i> Thông tin cơ bản</h3>
+                  <div class="form-row">
+                      <div class="form-group">
+                          <label>Tên Vật Phẩm/Sản Phẩm *</label>
+                          <input type="text" id="eb_name" class="form-control" placeholder="VD: Gói VIP Diamond, Thuốc Lắc XP" oninput="updateLivePreview()">
+                      </div>
+                      <div class="form-group">
+                          <label>Giá bán (VND) *</label>
+                          <input type="number" id="eb_price" class="form-control" placeholder="VD: 500000" oninput="updateLivePreview()">
+                      </div>
+                  </div>
+                  <div class="form-group">
+                      <label>Mô tả vật phẩm</label>
+                      <input type="text" id="eb_descShort" class="form-control" placeholder="Mô tả công năng của vật phẩm..." oninput="updateLivePreview()">
+                  </div>
+                  <div class="form-row">
+                      <div class="form-group">
+                          <label>Danh mục</label>
+                          <select id="eb_category" class="form-control" onchange="updateLivePreview()">
+                              <option value="VIP">Gói VIP</option>
+                              <option value="Premium">Dịch vụ Premium</option>
+                              <option value="Vật phẩm">Vật phẩm (Consumable)</option>
+                              <option value="Đầu tư">Công cụ đầu tư</option>
+                              <option value="Sự kiện">Vé Sự kiện</option>
+                          </select>
+                      </div>
+                      <div class="form-group">
+                          <label>Độ hiếm (Badge)</label>
+                          <select id="eb_rarity" class="form-control" onchange="updateLivePreview()">
+                              <option value="">Thường (Không có)</option>
+                              <option value="Rare">Rare (Hiếm)</option>
+                              <option value="Epic">Epic (Sử thi)</option>
+                              <option value="Legendary">Legendary (Huyền thoại)</option>
+                          </select>
+                      </div>
+                  </div>
+              </div>
+
+              <!-- HỆ THỐNG THỜI HẠN & TIÊU HAO -->
+              <div class="eb-card" style="border-left: 4px solid var(--primary);">
+                  <h3><i class="ph-bold ph-hourglass-high"></i> Thuộc tính Thời hạn & Tiêu hao</h3>
+                  <div class="form-row">
+                      <div class="form-group" style="flex: 2;">
+                          <label>Thời hạn sử dụng (Duration)</label>
+                          <select id="eb_duration" class="form-control" onchange="updateLivePreview()">
+                              <option value="-1">Vĩnh viễn (Permanent)</option>
+                              <option value="300000">5 Phút</option>
+                              <option value="900000">15 Phút</option>
+                              <option value="1800000">30 Phút</option>
+                              <option value="3600000">1 Giờ</option>
+                              <option value="86400000">1 Ngày</option>
+                              <option value="259200000">3 Ngày</option>
+                              <option value="604800000">7 Ngày</option>
+                              <option value="1296000000">15 Ngày</option>
+                              <option value="2592000000">30 Ngày</option>
+                              <option value="7776000000">90 Ngày</option>
+                          </select>
+                      </div>
+                      <div class="form-group" style="flex: 1; display:flex; flex-direction:column; justify-content:center; gap: 10px; margin-top:10px;">
+                          <label class="switch-container">
+                              <input type="checkbox" id="eb_isConsumable" class="switch-input" onchange="updateLivePreview()">
+                              <div class="switch-bg"><div class="switch-handle"></div></div>
+                              <span style="font-size:13px; font-weight:600; color:#eab308;">Là vật phẩm tiêu hao (Mất đi khi sử dụng)</span>
+                          </label>
+                          <label class="switch-container">
+                              <input type="checkbox" id="eb_autoConsume" class="switch-input" onchange="updateLivePreview()">
+                              <div class="switch-bg"><div class="switch-handle"></div></div>
+                              <span style="font-size:13px; font-weight:600;">Tự động dùng ngay khi mua (Không lưu vào kho)</span>
+                          </label>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="eb-card">
+                  <h3><i class="ph-bold ph-image"></i> Icon Picker</h3>
+                  <input type="hidden" id="eb_icon" value="ph-package">
+                  <div class="icon-grid" id="iconGridContainer">
+                      <!-- Icons generated by JS -->
+                  </div>
+              </div>
+
+              <!-- CHUỖI HIỆU ỨNG -->
+              <div class="eb-card">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px;">
+                      <h3 style="margin:0;"><i class="ph-bold ph-lightning"></i> Cấu hình Chuỗi Hiệu ứng (Effect Engine)</h3>
+                      <button class="btn-soft" onclick="addEffectRow()"><i class="ph-bold ph-plus"></i> Thêm hiệu ứng</button>
+                  </div>
+                  <p class="muted" style="margin-top:-10px; margin-bottom:16px;">Khi người dùng KÍCH HOẠT vật phẩm, toàn bộ hiệu ứng dưới đây sẽ được áp dụng cùng lúc.</p>
+                  
+                  <div id="eb_effects_container">
+                      <!-- Effect rows go here -->
+                  </div>
+                  <div id="eb_effects_empty" class="row-empty" style="padding:20px; background:#fafafa; border-radius:8px; border:1px dashed #ccc;">Chưa có hiệu ứng nào được cấu hình.</div>
+              </div>
+
+              <div class="eb-card">
+                 <div class="form-row">
+                      <label class="switch-container">
+                          <input type="checkbox" id="eb_transferable" class="switch-input" checked>
+                          <div class="switch-bg"><div class="switch-handle"></div></div>
+                          <span style="font-size:13px; font-weight:600;">Cho phép giao dịch P2P</span>
+                      </label>
+                      <label class="switch-container">
+                          <input type="checkbox" id="eb_isActive" class="switch-input" checked>
+                          <div class="switch-bg"><div class="switch-handle"></div></div>
+                          <span style="font-size:13px; font-weight:600;">Hiển thị trên Marketplace (Active)</span>
+                      </label>
+                  </div>
+              </div>
+          </div>
+
+          <!-- Live Preview Area -->
+          <div class="eb-preview-area">
+              <h3 style="align-self:flex-start; margin-top:0; font-size:14px; color:#666; text-transform:uppercase;">Live Preview Trên App</h3>
+              <div class="preview-product" id="pv_card">
+                  <div class="preview-badge bg-slate-200 text-slate-600" id="pv_rarity" style="display:none;"></div>
+                  <div class="preview-icon-box"><i class="ph-fill ph-package" id="pv_icon"></i></div>
+                  
+                  <div class="preview-meta" id="pv_meta">
+                      <span class="preview-meta-chip" id="pv_duration_badge"><i class="ph-fill ph-clock"></i> Vĩnh viễn</span>
+                  </div>
+
+                  <div class="preview-cat" id="pv_category">GÓI VIP</div>
+                  <div class="preview-title" id="pv_name">Tên Sản Phẩm</div>
+                  <div class="preview-desc" id="pv_descShort">Mô tả ngắn của sản phẩm sẽ hiện ở đây.</div>
+                  <div class="preview-btn" id="pv_price">Mua ngay - 0₫</div>
+                  
+                  <div class="preview-effect-list" id="pv_effect_list">
+                      <!-- effects preview -->
+                  </div>
+              </div>
+              <p class="muted" style="margin-top:20px; text-align:center; font-size:12px;">*Hệ thống tự động xóa các hiệu ứng có thời hạn (như Badge, Lãi suất, Role) khi vật phẩm hết hạn.</p>
+          </div>
+      </div>
+  </div>
+
   <script>
     // ===== Firebase Config =====
       const firebaseConfig = {
@@ -272,7 +492,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // ===== Session (để đăng xuất) =====
+    // ===== Session =====
     const SESSION_KEY = "app_session";
     function clearSession(){ localStorage.removeItem(SESSION_KEY); }
     document.getElementById("logoutBtn").addEventListener("click", function (e) {
@@ -293,64 +513,336 @@
     });
 
     // ===== Helpers =====
-    function formatCurrency(vnd) {
-      return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(vnd || 0);
-    }
-    function safe(obj, path, def = "") {
-      try { return path.split(".").reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj) ?? def; }
-      catch { return def; }
-    }
-    function normalizeKey(value) {
-      return String(value ?? "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .toLowerCase();
-    }
+    function formatCurrency(vnd) { return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(vnd || 0); }
+    function safe(obj, path, def = "") { try { return path.split(".").reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj) ?? def; } catch { return def; } }
+    function normalizeKey(value) { return String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase(); }
 
     // ===== Market status =====
-    function setMarketStatus(type, status) {
-  const refPath = type === 'coin' ? 'market_coin/status' : 'market_stock/status';
-  const statusText = status === "open" ? `✅ Sàn ${type === 'coin' ? 'Coin' : 'CK'} đã mở.` : `🚫 Sàn ${type === 'coin' ? 'Coin' : 'CK'} đã đóng.`;
-  db.ref(refPath).set(status)
-    .then(() => alert(statusText))
-    .catch(err => alert("❌ Lỗi cập nhật trạng thái: " + err.message));
-}
-
-// Hiển thị trạng thái Coin
-db.ref("market_coin/status").on("value", snap => {
-  const el = document.getElementById("marketStatusCoin");
-  const status = snap.val();
-  el.textContent = status === "open" ? "🟢 Đang mở" : "🔴 Đang đóng";
-});
-
-// Hiển thị trạng thái Chứng khoán
-db.ref("market_stock/status").on("value", snap => {
-  const el = document.getElementById("marketStatusStock");
-  const status = snap.val();
-  el.textContent = status === "open" ? "🟢 Đang mở" : "🔴 Đang đóng";
-});
-
-
+    window.setMarketStatus = function(type, status) {
+        const refPath = type === 'coin' ? 'market_coin/status' : 'market_stock/status';
+        const statusText = status === "open" ? `✅ Sàn ${type === 'coin' ? 'Coin' : 'CK'} đã mở.` : `🚫 Sàn ${type === 'coin' ? 'Coin' : 'CK'} đã đóng.`;
+        db.ref(refPath).set(status).then(() => alert(statusText)).catch(err => alert("❌ Lỗi: " + err.message));
+    }
+    db.ref("market_coin/status").on("value", snap => { document.getElementById("marketStatusCoin").textContent = snap.val() === "open" ? "🟢 Đang mở" : "🔴 Đang đóng"; });
+    db.ref("market_stock/status").on("value", snap => { document.getElementById("marketStatusStock").textContent = snap.val() === "open" ? "🟢 Đang mở" : "🔴 Đang đóng"; });
 
     // ===== WinRate config =====
     const winRateCfgRef = db.ref("config/stock/winRate");
     const winRateInput = document.getElementById("winRateInput");
-    const currentWinRateLabel = document.getElementById("currentWinRateLabel");
-
     winRateCfgRef.on("value", snap => {
-      const val = Number(snap.val());
-      const wr = Number.isFinite(val) ? Math.max(0, Math.min(100, Math.round(val))) : 50;
+      const wr = Number.isFinite(Number(snap.val())) ? Math.max(0, Math.min(100, Math.round(Number(snap.val())))) : 50;
       if (winRateInput) winRateInput.value = wr;
-      if (currentWinRateLabel) currentWinRateLabel.textContent = `Hiện tại: ${wr}%`;
+      if (document.getElementById("currentWinRateLabel")) document.getElementById("currentWinRateLabel").textContent = `Hiện tại: ${wr}%`;
     });
-    function saveWinRate() {
-      const raw = Number(winRateInput.value);
-      const wr = Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : 50;
-      winRateCfgRef.set(wr).then(() => alert(`Đã lưu tỉ lệ trúng Chứng khoán: ${wr}%`))
-      .catch(err => alert("❌ Lỗi lưu tỉ lệ: " + err.message));
+    window.saveWinRate = function() {
+      const wr = Number.isFinite(Number(winRateInput.value)) ? Math.max(0, Math.min(100, Math.round(Number(winRateInput.value)))) : 50;
+      winRateCfgRef.set(wr).then(() => alert(`Đã lưu tỉ lệ: ${wr}%`)).catch(err => alert("Lỗi: " + err.message));
     }
+
+    /** =====================================================================
+     * MARKETPLACE & ADVANCED EFFECT BUILDER ENGINE
+     * ===================================================================== */
+    
+    let allProducts = [];
+    
+    const iconList = [
+        'ph-package', 'ph-star', 'ph-diamond', 'ph-crown', 'ph-shield-check', 'ph-shield-star',
+        'ph-trend-up', 'ph-rocket-launch', 'ph-briefcase', 'ph-piggy-bank', 'ph-chart-bar',
+        'ph-robot', 'ph-graduation-cap', 'ph-gift', 'ph-medal', 'ph-key', 'ph-lock-key-open',
+        'ph-lightning', 'ph-fire', 'ph-sword', 'ph-infinity', 'ph-bank', 'ph-ticket', 'ph-flask'
+    ];
+
+    function initIconPicker() {
+        const container = document.getElementById('iconGridContainer');
+        container.innerHTML = iconList.map(icon => 
+            `<div class="icon-item" data-icon="${icon}" onclick="selectIcon('${icon}')"><i class="ph-fill ${icon}"></i></div>`
+        ).join('');
+    }
+
+    window.selectIcon = function(iconName) {
+        document.getElementById('eb_icon').value = iconName;
+        document.querySelectorAll('.icon-item').forEach(el => el.classList.remove('selected'));
+        document.querySelector(`.icon-item[data-icon="${iconName}"]`).classList.add('selected');
+        updateLivePreview();
+    }
+
+    function renderMarketplace() {
+        const tbody = document.getElementById('mkTableBody');
+        db.ref('products').on('value', snap => {
+            allProducts = [];
+            tbody.innerHTML = '';
+            snap.forEach(child => { allProducts.push({ id: child.key, ...child.val() }); });
+
+            if(allProducts.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="row-empty">Chưa có sản phẩm nào trên Marketplace.</td></tr>`;
+                return;
+            }
+
+            allProducts.forEach(p => {
+                const tr = document.createElement('tr');
+                const effectsCount = p.effects ? p.effects.length : 0;
+                let durationLabel = p.duration == -1 ? 'Vĩnh viễn' : `${p.duration / (24*60*60*1000)} Ngày`;
+                if(p.duration && p.duration > 0 && p.duration < 86400000) durationLabel = `${p.duration / 60000} Phút`;
+
+                tr.innerHTML = `
+                    <td style="font-size:11px; color:#888;">${p.id.substring(1,8)}...</td>
+                    <td>
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <div style="width:36px; height:36px; background:#f0f4ff; color:var(--primary); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:20px;"><i class="ph-fill ${p.icon||'ph-package'}"></i></div>
+                            <div>
+                                <div style="font-weight:700;">${p.name}</div>
+                                <div style="display:flex; gap:4px; margin-top:2px;">
+                                    ${p.rarity ? `<span style="font-size:10px; font-weight:bold; color:#f59e0b; background:#fef3c7; padding:2px 6px; border-radius:4px;">${p.rarity}</span>` : ''}
+                                    <span style="font-size:10px; font-weight:bold; color:#475569; background:#f1f5f9; padding:2px 6px; border-radius:4px;">${durationLabel}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="chip" style="margin-bottom:4px; display:inline-block;">${p.category}</span><br>
+                        ${p.isConsumable ? '<span style="font-size:10px; color:#eab308; font-weight:bold;">🔥 Tiêu hao</span>' : ''}
+                        ${p.autoConsume ? '<span style="font-size:10px; color:#3b82f6; font-weight:bold; margin-left:4px;">⚡ Tự dùng</span>' : ''}
+                    </td>
+                    <td class="right" style="font-weight:700; color:var(--primary);">${formatCurrency(p.price)}</td>
+                    <td class="center"><span style="background:#eef4ff; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:bold; color:var(--btn);">${effectsCount} Rule</span></td>
+                    <td class="center">${p.isActive !== false ? '🟢 Active' : '🔴 Ẩn'}</td>
+                    <td class="right nowrap">
+                        <button class="btn-soft" onclick="editProduct('${p.id}')">Sửa</button>
+                        <button class="btn-lose" onclick="deleteProduct('${p.id}')">Xóa</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        });
+    }
+
+    // Advanced Effect Builder Logic
+    let currentEffects = [];
+
+    // Danh sách Effect Types Mở rộng
+    const effectTemplates = {
+        // Tiền tệ & Chỉ số
+        add_money: { label: '💰 + Cộng Tiền (VND)', type: 'number', placeholder: 'Số tiền cộng vào' },
+        multiply_money: { label: '💰 × Nhân Tiền', type: 'number', placeholder: 'Hệ số (VD: 1.5, 2)' },
+        add_xp: { label: '⭐ + Thêm XP', type: 'number', placeholder: 'Số XP' },
+        add_luck: { label: '🍀 + % Luck (May mắn)', type: 'number', placeholder: 'Phần trăm (VD: 10, 20)' },
+        // Buffs & Roles (Có thời hạn)
+        set_vip: { label: '👑 Mở khóa VIP', type: 'text', placeholder: 'Tên VIP (VD: Diamond)' },
+        set_badge: { label: '🏷️ Đeo Danh Hiệu (Badge)', type: 'text', placeholder: 'Tên hiển thị trên tên' },
+        set_role: { label: '🎭 Cấp Role hệ thống', type: 'text', placeholder: 'Role ID (VD: Admin, Premium)' },
+        set_bank_interest: { label: '📈 Đổi Lãi Suất Gửi Tiết Kiệm', type: 'number', placeholder: 'Hệ số (VD: 0.05 là 5%)' },
+        // Tính năng
+        unlock_feature: { label: '🔓 Mở khóa Tính năng', type: 'text', placeholder: 'Mã tính năng (VD: ai_bot, etf_pro)' },
+        trigger_event: { label: '🎉 Gọi Event đặc biệt', type: 'text', placeholder: 'Event ID' }
+    };
+
+    window.openEffectBuilder = function() {
+        document.getElementById('effectBuilderModal').style.display = 'flex';
+        document.getElementById('ebModeText').textContent = "Tạo sản phẩm mới";
+        document.getElementById('eb_prod_id').value = "";
+        
+        // Reset form
+        document.getElementById('eb_name').value = "";
+        document.getElementById('eb_price').value = "";
+        document.getElementById('eb_descShort').value = "";
+        document.getElementById('eb_category').value = "VIP";
+        document.getElementById('eb_rarity').value = "";
+        document.getElementById('eb_duration').value = "-1";
+        document.getElementById('eb_isConsumable').checked = false;
+        document.getElementById('eb_autoConsume').checked = false;
+        document.getElementById('eb_transferable').checked = true;
+        document.getElementById('eb_isActive').checked = true;
+        selectIcon('ph-package');
+
+        currentEffects = [];
+        renderEffectRows();
+        updateLivePreview();
+    }
+
+    window.closeEffectBuilder = function() { document.getElementById('effectBuilderModal').style.display = 'none'; }
+
+    window.editProduct = function(id) {
+        const p = allProducts.find(x => x.id === id);
+        if(!p) return;
+
+        document.getElementById('effectBuilderModal').style.display = 'flex';
+        document.getElementById('ebModeText').textContent = "Chỉnh sửa sản phẩm";
+        document.getElementById('eb_prod_id').value = id;
+        
+        document.getElementById('eb_name').value = p.name || '';
+        document.getElementById('eb_price').value = p.price || '';
+        document.getElementById('eb_descShort').value = p.descShort || '';
+        document.getElementById('eb_category').value = p.category || 'VIP';
+        document.getElementById('eb_rarity').value = p.rarity || '';
+        document.getElementById('eb_duration').value = p.duration !== undefined ? p.duration : '-1';
+        document.getElementById('eb_isConsumable').checked = !!p.isConsumable;
+        document.getElementById('eb_autoConsume').checked = !!p.autoConsume;
+        document.getElementById('eb_transferable').checked = p.transferable !== false;
+        document.getElementById('eb_isActive').checked = p.isActive !== false;
+        selectIcon(p.icon || 'ph-package');
+
+        currentEffects = p.effects ? [...p.effects] : [];
+        renderEffectRows();
+        updateLivePreview();
+    }
+
+    window.deleteProduct = function(id) {
+        if(confirm("Chắc chắn xóa sản phẩm này khỏi Marketplace?\nLưu ý: Không ảnh hưởng đến các item user đã lưu trong kho.")) {
+            db.ref(`products/${id}`).remove();
+        }
+    }
+
+    window.addEffectRow = function() {
+        currentEffects.push({ type: 'add_money', value: '' });
+        renderEffectRows();
+        updateLivePreview();
+    }
+
+    window.removeEffectRow = function(index) {
+        currentEffects.splice(index, 1);
+        renderEffectRows();
+        updateLivePreview();
+    }
+
+    window.updateEffect = function(index, field, value) {
+        currentEffects[index][field] = value;
+        if(field === 'type') { currentEffects[index].value = ''; renderEffectRows(); }
+        updateLivePreview();
+    }
+
+    function renderEffectRows() {
+        const container = document.getElementById('eb_effects_container');
+        const emptyState = document.getElementById('eb_effects_empty');
+        
+        container.innerHTML = '';
+        if(currentEffects.length === 0) {
+            emptyState.style.display = 'block';
+            return;
+        }
+        emptyState.style.display = 'none';
+
+        currentEffects.forEach((ef, idx) => {
+            const template = effectTemplates[ef.type];
+            const div = document.createElement('div');
+            div.className = 'effect-row';
+            div.innerHTML = `
+                <div style="width: 30px; font-weight:bold; color:#999; padding-top:10px;">#${idx+1}</div>
+                <div style="flex:1; min-width: 200px;">
+                    <label style="font-size:11px; color:#666; display:block; margin-bottom:4px;">Loại Hiệu Ứng</label>
+                    <select onchange="updateEffect(${idx}, 'type', this.value)">
+                        ${Object.keys(effectTemplates).map(k => `<option value="${k}" ${ef.type===k?'selected':''}>${effectTemplates[k].label}</option>`).join('')}
+                    </select>
+                </div>
+                <div style="flex:1; min-width: 150px;">
+                    <label style="font-size:11px; color:#666; display:block; margin-bottom:4px;">Giá trị / Tên / Hệ số</label>
+                    <input type="${template.type}" value="${ef.value}" placeholder="${template.placeholder}" oninput="updateEffect(${idx}, 'value', this.value)">
+                </div>
+                <button class="remove-effect" onclick="removeEffectRow(${idx})" title="Xóa" style="margin-top: 22px;"><i class="ph-bold ph-trash"></i></button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    window.updateLivePreview = function() {
+        const name = document.getElementById('eb_name').value || 'Tên Sản Phẩm';
+        const price = document.getElementById('eb_price').value || '0';
+        const desc = document.getElementById('eb_descShort').value || 'Mô tả ngắn của sản phẩm sẽ hiện ở đây.';
+        const cat = document.getElementById('eb_category').value || 'VIP';
+        const rarity = document.getElementById('eb_rarity').value;
+        const icon = document.getElementById('eb_icon').value;
+        const duration = parseInt(document.getElementById('eb_duration').value);
+        const isConsumable = document.getElementById('eb_isConsumable').checked;
+        const autoConsume = document.getElementById('eb_autoConsume').checked;
+
+        document.getElementById('pv_name').textContent = name;
+        document.getElementById('pv_price').textContent = `Mua ngay - ${formatCurrency(price)}`;
+        document.getElementById('pv_descShort').textContent = desc;
+        document.getElementById('pv_category').textContent = cat.toUpperCase();
+        document.getElementById('pv_icon').className = `ph-fill ${icon}`;
+
+        const badge = document.getElementById('pv_rarity');
+        if(rarity) {
+            badge.style.display = 'block'; badge.textContent = rarity;
+            if(rarity === 'Legendary') { badge.style.background = '#f59e0b'; badge.style.color = '#fff'; }
+            else if(rarity === 'Epic') { badge.style.background = '#a855f7'; badge.style.color = '#fff'; }
+            else if(rarity === 'Rare') { badge.style.background = '#3b82f6'; badge.style.color = '#fff'; }
+        } else { badge.style.display = 'none'; }
+
+        // Meta Chips (Duration & Flags)
+        const metaContainer = document.getElementById('pv_meta');
+        metaContainer.innerHTML = '';
+        
+        let durText = "Vĩnh viễn";
+        if(duration > 0) {
+            if(duration < 3600000) durText = `${duration/60000} Phút`;
+            else if (duration < 86400000) durText = `${duration/3600000} Giờ`;
+            else durText = `${duration/86400000} Ngày`;
+        }
+        metaContainer.innerHTML += `<span class="preview-meta-chip"><i class="ph-fill ph-clock"></i> Thời hạn: ${durText}</span>`;
+        if(isConsumable) metaContainer.innerHTML += `<span class="preview-meta-chip" style="background:#fefce8; color:#a16207;"><i class="ph-fill ph-flask"></i> Tiêu hao</span>`;
+        if(autoConsume) metaContainer.innerHTML += `<span class="preview-meta-chip" style="background:#eff6ff; color:#1d4ed8;"><i class="ph-fill ph-lightning"></i> Dùng ngay</span>`;
+
+        // Preview effects
+        const efList = document.getElementById('pv_effect_list');
+        efList.innerHTML = '';
+        if(currentEffects.length > 0) {
+            currentEffects.forEach(ef => {
+                if(!ef.value) return;
+                let text = '';
+                if(ef.type === 'add_money') text = `Nhận ngay ${formatCurrency(ef.value)}`;
+                else if(ef.type === 'multiply_money') text = `Nhân tài sản x${ef.value}`;
+                else if(ef.type === 'set_bank_interest') text = `Lãi suất ưu đãi: ${Number(ef.value)*100}%`;
+                else if(ef.type === 'set_vip') text = `Mở khóa cấp: VIP ${ef.value}`;
+                else if(ef.type === 'set_badge') text = `Danh hiệu: [${ef.value}]`;
+                else if(ef.type === 'set_role') text = `Role hệ thống: ${ef.value}`;
+                else if(ef.type === 'add_xp') text = `Cộng ${ef.value} XP`;
+                else if(ef.type === 'add_luck') text = `Tăng ${ef.value}% May mắn`;
+                else if(ef.type === 'unlock_feature') text = `Mở tính năng: ${ef.value}`;
+                else if(ef.type === 'trigger_event') text = `Kích hoạt: ${ef.value}`;
+                
+                efList.innerHTML += `<div class="preview-effect-item"><i class="ph-bold ph-check-circle" style="color:var(--success)"></i> ${text}</div>`;
+            });
+        }
+    }
+
+    window.saveProduct = function() {
+        const id = document.getElementById('eb_prod_id').value;
+        const name = document.getElementById('eb_name').value.trim();
+        const price = parseInt(document.getElementById('eb_price').value);
+
+        if(!name) return alert("Vui lòng nhập tên sản phẩm.");
+        if(isNaN(price) || price < 0) return alert("Giá sản phẩm không hợp lệ.");
+
+        const productData = {
+            name: name,
+            price: price,
+            descShort: document.getElementById('eb_descShort').value,
+            category: document.getElementById('eb_category').value,
+            rarity: document.getElementById('eb_rarity').value,
+            icon: document.getElementById('eb_icon').value,
+            duration: parseInt(document.getElementById('eb_duration').value),
+            isConsumable: document.getElementById('eb_isConsumable').checked,
+            autoConsume: document.getElementById('eb_autoConsume').checked,
+            transferable: document.getElementById('eb_transferable').checked,
+            isActive: document.getElementById('eb_isActive').checked,
+            effects: currentEffects.filter(e => e.value !== '') // clean empty
+        };
+
+        if(id) {
+            db.ref(`products/${id}`).update(productData);
+            alert("Đã cập nhật sản phẩm thành công!");
+        } else {
+            db.ref('products').push().set(productData);
+            alert("Đã tạo sản phẩm mới thành công!");
+        }
+        closeEffectBuilder();
+    }
+
+
+    /** =====================================================================
+     * EXISTING MANAGERS (Coin, Stock, Users, Receipts, Loans) 
+     * Kept fully intact as requested
+     * ===================================================================== */
 
     // ===== Render Coin =====
     async function renderCoinList() {
@@ -366,9 +858,7 @@ db.ref("market_stock/status").on("value", snap => {
           if (!key || seen.has(key)) return;
           seen.add(key);
           const data = child.val();
-          if (data && data.username && data.amount) {
-            rows.push({ key, ...data });
-          }
+          if (data && data.username && data.amount) { rows.push({ key, ...data }); }
         });
 
         const grouped = new Map();
@@ -381,20 +871,15 @@ db.ref("market_stock/status").on("value", snap => {
             grouped.set(usernameKey, { ...log, username: rawUsername, amount, timestamp, count: 1 });
           } else {
             const existing = grouped.get(usernameKey);
-            existing.amount += amount;
-            existing.count += 1;
-            if (timestamp > (existing.timestamp || 0)) {
-              existing.timestamp = timestamp;
-              existing.key = log.key;
-            }
+            existing.amount += amount; existing.count += 1;
+            if (timestamp > (existing.timestamp || 0)) { existing.timestamp = timestamp; existing.key = log.key; }
           }
         });
 
         const aggregateRows = Array.from(grouped.values());
         let totalAmount = 0;
-        if (aggregateRows.length === 0) {
-          tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Không có lệnh nào.</td></tr>`;
-        } else {
+        if (aggregateRows.length === 0) { tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Không có lệnh nào.</td></tr>`; } 
+        else {
           aggregateRows.forEach(log => {
             const username = safe(log, "username", "-");
             const amount = Number(log.amount || 0);
@@ -413,214 +898,123 @@ db.ref("market_stock/status").on("value", snap => {
                     <button class="btn-lose btn-mini" data-user="${username}" data-logkey="${log.key}">Thua</button>
                   </div>
                 </div>
-              </td>
-            `;
+              </td>`;
             tbody.appendChild(tr);
           });
         }
-
         document.getElementById("coinTotalCount").textContent = aggregateRows.length;
         document.getElementById("coinTotalAmount").textContent = formatCurrency(totalAmount);
-      } catch (err) {
-        console.error("Render coin error:", err);
-        tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Lỗi hiển thị: ${String(err)}</td></tr>`;
-      }
+      } catch (err) { tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Lỗi hiển thị: ${String(err)}</td></tr>`; }
     }
+
     document.getElementById("coinLogTable").addEventListener("click", async (e) => {
-  const winBtn = e.target.closest(".btn-win");
-  const loseBtn = e.target.closest(".btn-lose");
-
-  if (winBtn) {
-    const username = winBtn.dataset.user;
-    const amount = Number(winBtn.dataset.amount || 0);
-    if (!username || !amount) return;
-    try {
-      await db.ref("users/" + username + "/balance").transaction(curr => (curr || 0) + amount * 2);
-      // Tìm và xóa log tương ứng
-      const snap = await db.ref("logs").once("value");
-      snap.forEach(child => {
-        const v = child.val() || {};
-        if (v.username === username && Number(v.amount) === amount) {
-          db.ref("logs/" + child.key).remove();
+        const winBtn = e.target.closest(".btn-win"); const loseBtn = e.target.closest(".btn-lose");
+        if (winBtn) {
+            const username = winBtn.dataset.user; const amount = Number(winBtn.dataset.amount || 0);
+            if (!username || !amount) return;
+            try {
+                await db.ref("users/" + username + "/balance").transaction(curr => (curr || 0) + amount * 2);
+                const snap = await db.ref("logs").once("value");
+                snap.forEach(child => { const v = child.val() || {}; if (v.username === username && Number(v.amount) === amount) { db.ref("logs/" + child.key).remove(); } });
+                renderCoinList();
+            } catch (err) { alert("❌ Lỗi xử lý thắng: " + err.message); }
         }
-      });
-      renderCoinList();
-    } catch (err) {
-      alert("❌ Lỗi xử lý thắng: " + err.message);
-    }
-  }
+        if (loseBtn) {
+            const key = loseBtn.dataset.logkey; if (!key) return;
+            try { await db.ref("logs/" + key).remove(); renderCoinList(); } 
+            catch (err) { alert("❌ Lỗi xử lý thua: " + err.message); }
+        }
+    });
 
-  if (loseBtn) {
-    const key = loseBtn.dataset.logkey;
-    if (!key) return;
-    try {
-      await db.ref("logs/" + key).remove();
-      renderCoinList();
-    } catch (err) {
-      alert("❌ Lỗi xử lý thua: " + err.message);
-    }
-  }
-});
-
-
-    // ===== Coin bulk actions =====
     async function handleWinCoin() {
       const snapshot = await db.ref("logs").once("value");
       if (!snapshot.exists()) { alert("Không có lệnh Coin."); return; }
-      const updates = {};
-      const ops = [];
+      const updates = {}; const ops = [];
       snapshot.forEach(child => {
-        const log = child.val();
-        const username = log?.username;
-        const amount = Number(log?.amount || 0);
+        const log = child.val(); const username = log?.username; const amount = Number(log?.amount || 0);
         updates["logs/" + child.key] = null;
         if (username && amount > 0) {
           const balRef = db.ref("users/" + username + "/balance");
-          ops.push(new Promise(resolve => {
-            balRef.transaction(curr => (curr || 0) + amount * 2, () => resolve());
-          }));
+          ops.push(new Promise(resolve => { balRef.transaction(curr => (curr || 0) + amount * 2, () => resolve()); }));
         }
       });
-      await Promise.all(ops);
-      await db.ref().update(updates);
-      alert("✅ Coin: Đã cộng x2 và reset danh sách!");
-      renderCoinList();
+      await Promise.all(ops); await db.ref().update(updates);
+      alert("✅ Coin: Đã cộng x2 và reset danh sách!"); renderCoinList();
     }
+
     async function handleLoseCoin() {
       const snapshot = await db.ref("logs").once("value");
       if (!snapshot.exists()) { alert("Không có lệnh Coin."); return; }
       const updates = {};
       snapshot.forEach(child => updates["logs/" + child.key] = null);
       await db.ref().update(updates);
-      alert("❌ Coin: Đã xoá danh sách!");
-      renderCoinList();
+      alert("❌ Coin: Đã xoá danh sách!"); renderCoinList();
     }
 
     // ===== Render Stock =====
     function renderStockListFromSnap(snap) {
-  const tbody = document.getElementById("stockLogTable");
-  tbody.innerHTML = "";
-  try {
-    const rows = [];
-    const seen = new Set();
-    const data = snap.val() || {};
-    for (const rawKey in data) {
-      if (!Object.prototype.hasOwnProperty.call(data, rawKey)) continue;
-      const key = String(rawKey || "").trim();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      rows.push({ key, ...data[rawKey] });
-    }
-
-    const grouped = new Map();
-    rows.forEach(log => {
-      const rawUsername = String(safe(log, "username", "-"))?.trim();
-      const usernameKey = normalizeKey(rawUsername);
-      const amount = Number(safe(log, "amount", 0));
-      const timestamp = Number(log.timestamp || 0);
-      if (!grouped.has(usernameKey)) {
-        grouped.set(usernameKey, { ...log, username: rawUsername, amount, timestamp, count: 1 });
-      } else {
-        const existing = grouped.get(usernameKey);
-        existing.amount += amount;
-        existing.count += 1;
-        if (timestamp > (existing.timestamp || 0)) {
-          existing.timestamp = timestamp;
-          existing.key = log.key;
-          existing.winRate = log.winRate;
-          existing.finalBar = log.finalBar;
-          existing.result = log.result;
-        }
-      }
-    });
-
-    const aggregateRows = Array.from(grouped.values());
-
-    function getTimeSafe(log) {
-      try {
-        return new Date(log.timestamp).getTime() || 0;
-      } catch {
-        return 0;
-      }
-    }
-
-    aggregateRows.sort((a, b) => getTimeSafe(b) - getTimeSafe(a));
-
-    let totalAmount = 0;
-    if (aggregateRows.length === 0) {
-      tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Không có lệnh nào.</td></tr>`;
-    } else {
-      tbody.innerHTML = "";
-      aggregateRows.forEach(log => {
-        const username = safe(log, "username", "-");
-        const amount = Number(safe(log, "amount", 0));
-        const winRate = safe(log, "winRate", "-");
-        const finalBar = safe(log, "finalBar", "-");
-        const result = safe(log, "result", "-");
-
-        let ts = "-";
+        const tbody = document.getElementById("stockLogTable");
+        tbody.innerHTML = "";
         try {
-          ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : "-";
-        } catch {}
+            const rows = []; const seen = new Set(); const data = snap.val() || {};
+            for (const rawKey in data) {
+                if (!Object.prototype.hasOwnProperty.call(data, rawKey)) continue;
+                const key = String(rawKey || "").trim(); if (!key || seen.has(key)) continue;
+                seen.add(key); rows.push({ key, ...data[rawKey] });
+            }
 
-        totalAmount += amount || 0;
+            const grouped = new Map();
+            rows.forEach(log => {
+                const rawUsername = String(safe(log, "username", "-"))?.trim(); const usernameKey = normalizeKey(rawUsername);
+                const amount = Number(safe(log, "amount", 0)); const timestamp = Number(log.timestamp || 0);
+                if (!grouped.has(usernameKey)) { grouped.set(usernameKey, { ...log, username: rawUsername, amount, timestamp, count: 1 }); } 
+                else {
+                    const existing = grouped.get(usernameKey); existing.amount += amount; existing.count += 1;
+                    if (timestamp > (existing.timestamp || 0)) { existing.timestamp = timestamp; existing.key = log.key; existing.winRate = log.winRate; existing.finalBar = log.finalBar; existing.result = log.result; }
+                }
+            });
 
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
-          <td>${username}</td>
-          <td class="right">${formatCurrency(amount)}</td>
-          <td>${winRate === "-" ? "-" : (winRate + "%")}</td>
-          <td>${finalBar}</td>
-          <td>${result}</td>
-          <td>${ts}</td>
-        `;
-        tbody.appendChild(tr);
-      });
+            const aggregateRows = Array.from(grouped.values());
+            function getTimeSafe(log) { try { return new Date(log.timestamp).getTime() || 0; } catch { return 0; } }
+            aggregateRows.sort((a, b) => getTimeSafe(b) - getTimeSafe(a));
+
+            let totalAmount = 0;
+            if (aggregateRows.length === 0) { tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Không có lệnh nào.</td></tr>`; } 
+            else {
+                tbody.innerHTML = "";
+                aggregateRows.forEach(log => {
+                    const username = safe(log, "username", "-"); const amount = Number(safe(log, "amount", 0));
+                    const winRate = safe(log, "winRate", "-"); const finalBar = safe(log, "finalBar", "-"); const result = safe(log, "result", "-");
+                    let ts = "-"; try { ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : "-"; } catch {}
+                    totalAmount += amount || 0;
+                    const tr = document.createElement("tr");
+                    tr.innerHTML = `<td>${username}</td><td class="right">${formatCurrency(amount)}</td><td>${winRate === "-" ? "-" : (winRate + "%")}</td><td>${finalBar}</td><td>${result}</td><td>${ts}</td>`;
+                    tbody.appendChild(tr);
+                });
+            }
+            document.getElementById("stockTotalCount").textContent = aggregateRows.length;
+            document.getElementById("stockTotalAmount").textContent = formatCurrency(totalAmount);
+        } catch (err) { tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Lỗi hiển thị: ${String(err)}</td></tr>`; }
     }
-
-    document.getElementById("stockTotalCount").textContent = aggregateRows.length;
-    document.getElementById("stockTotalAmount").textContent = formatCurrency(totalAmount);
-  } catch (err) {
-    console.error("Render stock error:", err);
-    tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Lỗi hiển thị: ${String(err)}</td></tr>`;
-  }
-}
-
-
 
     async function renderStockListOnce() {
-      const tbody = document.getElementById("stockLogTable");
-      tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Đang tải...</td></tr>`;
-      try {
-        const snap = await db.ref("logs_stock").once("value");
-        renderStockListFromSnap(snap);
-      } catch (err) {
-        console.error("Read stock error:", err);
-        tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Lỗi đọc dữ liệu: ${String(err)}</td></tr>`;
-      }
+      const tbody = document.getElementById("stockLogTable"); tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Đang tải...</td></tr>`;
+      try { const snap = await db.ref("logs_stock").once("value"); renderStockListFromSnap(snap); } 
+      catch (err) { tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Lỗi đọc dữ liệu: ${String(err)}</td></tr>`; }
     }
 
-    // ===== Reset tổng tiền CK (xoá logs_stock) =====
     async function resetStockTotal() {
       const confirm1 = confirm("Bạn chắc chắn muốn RESET tổng tiền chứng khoán?\nHành động này sẽ xoá TẤT CẢ lệnh trong logs_stock.");
       if (!confirm1) return;
       const confirmText = prompt("Gõ 'RESET' để xác nhận xoá toàn bộ lệnh CK:");
       if (confirmText !== 'RESET') { alert("Đã huỷ."); return; }
-
       try {
         const snap = await db.ref("logs_stock").once("value");
         if (!snap.exists()) { alert("Không có lệnh chứng khoán nào để xoá."); return; }
-
-        const updates = {};
-        snap.forEach(child => { updates[`logs_stock/${child.key}`] = null; });
-
+        const updates = {}; snap.forEach(child => { updates[`logs_stock/${child.key}`] = null; });
         await db.ref().update(updates);
-        alert("♻️ Đã reset tổng tiền chứng khoán (đã xoá các lệnh CK).");
-        renderStockListOnce();
-      } catch (err) {
-        console.error(err);
-        alert("❌ Lỗi khi reset tổng tiền CK: " + err.message);
-      }
+        alert("♻️ Đã reset tổng tiền chứng khoán."); renderStockListOnce();
+      } catch (err) { alert("❌ Lỗi khi reset tổng tiền CK: " + err.message); }
     }
 
     // ===== Users =====
@@ -629,398 +1023,187 @@ db.ref("market_stock/status").on("value", snap => {
       const search = (document.getElementById("userSearch").value || "").trim().toLowerCase();
       tbody.innerHTML = "";
       try {
-        const snap = await db.ref("users").once("value");
-        const usersMap = new Map();
+        const snap = await db.ref("users").once("value"); const usersMap = new Map();
         snap.forEach(child => {
-          const key = String(child.key || "").trim();
-          if (!key || usersMap.has(key)) return;
-          const val = child.val() || {};
-          const name = String(val.username || key).trim();
-          const balance = Number(val.balance || 0);
+          const key = String(child.key || "").trim(); if (!key || usersMap.has(key)) return;
+          const val = child.val() || {}; const name = String(val.username || key).trim(); const balance = Number(val.balance || 0);
           usersMap.set(key, { key, name, balance });
         });
         const rows = Array.from(usersMap.values());
-        const filtered = rows.filter(r =>
-          r.key.toLowerCase().includes(search) || (r.name + "").toLowerCase().includes(search)
-        );
+        const filtered = rows.filter(r => r.key.toLowerCase().includes(search) || (r.name + "").toLowerCase().includes(search));
         filtered.sort((a, b) => (a.name || "").localeCompare(b.name || "") || a.key.localeCompare(b.key));
 
-        if (filtered.length === 0) {
-          tbody.innerHTML = `<tr><td class="row-empty" colspan="5">Không có người dùng.</td></tr>`;
-          return;
-        }
+        if (filtered.length === 0) { tbody.innerHTML = `<tr><td class="row-empty" colspan="5">Không có người dùng.</td></tr>`; return; }
         filtered.forEach(r => {
-          const tr = document.createElement("tr");
-          tr.dataset.userKey = r.key;
+          const tr = document.createElement("tr"); tr.dataset.userKey = r.key;
           tr.innerHTML = `
-            <td class="nowrap">${r.key}</td>
-            <td>${r.name || "-"}</td>
-            <td class="right">${formatCurrency(r.balance)}</td>
+            <td class="nowrap">${r.key}</td><td>${r.name || "-"}</td><td class="right">${formatCurrency(r.balance)}</td>
             <td class="right"><input type="number" class="input-small bal-input" data-user="${r.key}" step="1000" placeholder="ví dụ: -1000 hoặc 1000" /></td>
             <td class="nowrap">
               <button class="btn btn-primary btn-save" data-user="${r.key}">💾 Lưu (±)</button>
               <button class="btn btn-soft btn-plus" data-user="${r.key}" data-delta="10000">+10.000</button>
               <button class="btn btn-soft btn-minus" data-user="${r.key}" data-delta="-10000">-10.000</button>
               <button class="btn btn-lose btn-del" data-user="${r.key}">🗑️ Xóa</button>
-            </td>
-          `;
+            </td>`;
           tbody.appendChild(tr);
         });
-      } catch (err) {
-        console.error("Render users error:", err);
-        tbody.innerHTML = `<tr><td class="row-empty" colspan="5">Lỗi hiển thị: ${String(err)}</td></tr>`;
-      }
+      } catch (err) { tbody.innerHTML = `<tr><td class="row-empty" colspan="5">Lỗi hiển thị: ${String(err)}</td></tr>`; }
     }
 
     async function deleteUserAndData(userKey) {
-      const updates = {};
-      updates[`users/${userKey}`] = null;
-      updates[`loans/${userKey}`] = null;
-
-      const coinSnap = await db.ref("logs").once("value");
-      coinSnap.forEach(child => {
-        const v = child.val() || {};
-        if (v.username === userKey) updates[`logs/${child.key}`] = null;
-      });
-
-      const stockSnap = await db.ref("logs_stock").once("value");
-      stockSnap.forEach(child => {
-        const v = child.val() || {};
-        if (v.username === userKey) updates[`logs_stock/${child.key}`] = null;
-      });
-
-      const transferSnap = await db.ref("transfers").once("value");
-      transferSnap.forEach(child => {
-        const v = child.val() || {};
-        if (v.from === userKey || v.to === userKey) updates[`transfers/${child.key}`] = null;
-      });
-
-      const receiptSnap = await db.ref("receipts").once("value");
-      receiptSnap.forEach(child => {
-        const v = child.val() || {};
-        if (v.target === 'all' || (v.users || []).includes(userKey)) {
-          updates[`receipts/${child.key}`] = null;
-        }
-      });
-
+      const updates = {}; updates[`users/${userKey}`] = null; updates[`loans/${userKey}`] = null;
+      const coinSnap = await db.ref("logs").once("value"); coinSnap.forEach(child => { const v = child.val() || {}; if (v.username === userKey) updates[`logs/${child.key}`] = null; });
+      const stockSnap = await db.ref("logs_stock").once("value"); stockSnap.forEach(child => { const v = child.val() || {}; if (v.username === userKey) updates[`logs_stock/${child.key}`] = null; });
+      const transferSnap = await db.ref("transfers").once("value"); transferSnap.forEach(child => { const v = child.val() || {}; if (v.from === userKey || v.to === userKey) updates[`transfers/${child.key}`] = null; });
+      const receiptSnap = await db.ref("receipts").once("value"); receiptSnap.forEach(child => { const v = child.val() || {}; if (v.target === 'all' || (v.users || []).includes(userKey)) { updates[`receipts/${child.key}`] = null; } });
       await db.ref().update(updates);
     }
 
     document.getElementById("usersTableBody").addEventListener("click", async (e) => {
-      const saveBtn = e.target.closest(".btn-save");
-      const plusBtn = e.target.closest(".btn-plus");
-      const minusBtn = e.target.closest(".btn-minus");
-      const delBtn  = e.target.closest(".btn-del");
+      const saveBtn = e.target.closest(".btn-save"); const plusBtn = e.target.closest(".btn-plus");
+      const minusBtn = e.target.closest(".btn-minus"); const delBtn  = e.target.closest(".btn-del");
 
       if (saveBtn) {
-        const userKey = saveBtn.dataset.user;
-        const input = document.querySelector(`.bal-input[data-user="${CSS.escape(userKey)}"]`);
-        const delta = Number(input?.value);
-        if (!Number.isFinite(delta)) { alert("Giá trị không hợp lệ."); return; }
+        const userKey = saveBtn.dataset.user; const input = document.querySelector(`.bal-input[data-user="${CSS.escape(userKey)}"]`);
+        const delta = Number(input?.value); if (!Number.isFinite(delta)) { alert("Giá trị không hợp lệ."); return; }
         try {
           await new Promise((resolve, reject) => {
-            db.ref(`users/${userKey}/balance`).transaction(curr => {
-              const cur = Number(curr || 0);
-              const next = cur + delta;
-              return next < 0 ? 0 : Math.round(next);
-            }, (error, committed, snap) => {
-              if (error) reject(error); else resolve(snap?.val());
-            });
+            db.ref(`users/${userKey}/balance`).transaction(curr => { const cur = Number(curr || 0); const next = cur + delta; return next < 0 ? 0 : Math.round(next); }, (error, committed, snap) => { if (error) reject(error); else resolve(snap?.val()); });
           });
-          input.value = "";
-          renderUsersList();
-          renderReceiptUsers();
+          input.value = ""; renderUsersList(); renderReceiptUsers();
         } catch (err) { alert("❌ Lỗi cập nhật: " + err.message); }
       }
-
       if (plusBtn || minusBtn) {
-        const btn = plusBtn || minusBtn;
-        const userKey = btn.dataset.user;
-        const delta = Number(btn.dataset.delta || 0);
+        const btn = plusBtn || minusBtn; const userKey = btn.dataset.user; const delta = Number(btn.dataset.delta || 0);
         try {
-          await db.ref(`users/${userKey}/balance`).transaction(curr => {
-            const cur = Number(curr || 0);
-            const next = cur + delta;
-            return next < 0 ? 0 : Math.round(next);
-          });
-          renderUsersList();
-          renderReceiptUsers();
+          await db.ref(`users/${userKey}/balance`).transaction(curr => { const cur = Number(curr || 0); const next = cur + delta; return next < 0 ? 0 : Math.round(next); });
+          renderUsersList(); renderReceiptUsers();
         } catch (err) { alert("❌ Lỗi cập nhật: " + err.message); }
       }
-
       if (delBtn) {
         const userKey = delBtn.dataset.user;
         const typed = prompt(`Bạn sắp XÓA vĩnh viễn tài khoản "${userKey}" cùng dữ liệu liên quan.\nNhập CHÍNH XÁC user key để xác nhận:`);
-        if (typed === null) return;
-        if (typed !== userKey) { alert("Chuỗi xác nhận không khớp. Đã hủy."); return; }
-
+        if (typed === null) return; if (typed !== userKey) { alert("Chuỗi xác nhận không khớp. Đã hủy."); return; }
         try {
-          delBtn.disabled = true;
-          delBtn.textContent = "Đang xóa...";
-          await deleteUserAndData(userKey);
-          alert(`✅ Đã xóa tài khoản và dữ liệu liên quan của "${userKey}".`);
-          renderUsersList();
-          renderReceiptUsers();
-          renderLoanReminders();
-        } catch (err) {
-          console.error(err);
-          alert("❌ Lỗi khi xóa: " + err.message);
-        } finally {
-          delBtn.disabled = false;
-          delBtn.textContent = "Xóa";
-        }
+          delBtn.disabled = true; delBtn.textContent = "Đang xóa..."; await deleteUserAndData(userKey); alert(`✅ Đã xóa tài khoản và dữ liệu liên quan của "${userKey}".`);
+          renderUsersList(); renderReceiptUsers(); renderLoanReminders();
+        } catch (err) { alert("❌ Lỗi khi xóa: " + err.message); } finally { delBtn.disabled = false; delBtn.textContent = "Xóa"; }
       }
     });
 
     window.receiptSelectedUsers = new Set();
     function updateReceiptSelectionChips() {
-      const chips = document.getElementById('receiptSelectedChips');
-      if (!chips) return;
+      const chips = document.getElementById('receiptSelectedChips'); if (!chips) return;
       chips.innerHTML = '';
       Array.from(window.receiptSelectedUsers).forEach(id => {
-        const chip = document.createElement('span');
-        chip.textContent = id;
+        const chip = document.createElement('span'); chip.textContent = id;
         chip.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#eff6ff;color:#0f172a;font-size:12px;cursor:pointer;';
-        chip.title = 'Nhấn để bỏ chọn';
-        chip.onclick = () => { window.receiptSelectedUsers.delete(id); renderReceiptUsers(); };
+        chip.title = 'Nhấn để bỏ chọn'; chip.onclick = () => { window.receiptSelectedUsers.delete(id); renderReceiptUsers(); };
         chips.appendChild(chip);
       });
     }
 
     async function renderReceiptUsers() {
-      const container = document.getElementById('receiptUserList');
-      if (!container) return;
+      const container = document.getElementById('receiptUserList'); if (!container) return;
       const search = (document.getElementById('receiptUserSearch')?.value || '').trim().toLowerCase();
-      const snap = await db.ref('users').once('value');
-      const usersMap = new Map();
+      const snap = await db.ref('users').once('value'); const usersMap = new Map();
       snap.forEach(child => {
-        const key = String(child.key || "").trim();
-        if (!key || usersMap.has(key)) return;
-        const val = child.val() || {};
-        const name = String(val.username || key).trim();
+        const key = String(child.key || "").trim(); if (!key || usersMap.has(key)) return;
+        const val = child.val() || {}; const name = String(val.username || key).trim();
         if (search && !(`${name} ${key}`.toLowerCase().includes(search))) return;
         usersMap.set(key, { key, name });
       });
-      const users = Array.from(usersMap.values());
-      container.innerHTML = '';
-      if (!users.length) {
-        container.innerHTML = '<div class="row-empty" style="padding:12px;">Không tìm thấy người dùng.</div>';
-        updateReceiptSelectionChips();
-        return;
-      }
+      const users = Array.from(usersMap.values()); container.innerHTML = '';
+      if (!users.length) { container.innerHTML = '<div class="row-empty" style="padding:12px;">Không tìm thấy người dùng.</div>'; updateReceiptSelectionChips(); return; }
       users.sort((a,b) => a.name.localeCompare(b.name));
       users.forEach(user => {
-        const row = document.createElement('div');
-        const selected = window.receiptSelectedUsers.has(user.key);
+        const row = document.createElement('div'); const selected = window.receiptSelectedUsers.has(user.key);
         row.style.cssText = `padding:10px 12px; margin-bottom:6px; border-radius:12px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; border:1px solid ${selected ? '#0369a1' : '#e2e8f0'}; background:${selected ? '#e0f2fe' : '#fff'};`;
         row.innerHTML = `<div style="display:flex;align-items:center;gap:10px;"><span style="width:28px;height:28px;border-radius:50%;background:#c7d2fe;color:#1d4ed8;display:flex;align-items:center;justify-content:center;font-weight:700;">${(user.name || '?').charAt(0).toUpperCase()}</span><div><div style="font-weight:600;color:#0f172a;">${user.name}</div><div style="font-size:12px;color:#64748b;">${user.key}</div></div></div><span style="font-size:12px;color:${selected ? '#0369a1' : '#64748b'};">${selected ? 'Đã chọn' : 'Chọn'}</span>`;
-        row.onclick = () => {
-          if (window.receiptSelectedUsers.has(user.key)) {
-            window.receiptSelectedUsers.delete(user.key);
-          } else {
-            window.receiptSelectedUsers.add(user.key);
-          }
-          renderReceiptUsers();
-        };
+        row.onclick = () => { if (window.receiptSelectedUsers.has(user.key)) { window.receiptSelectedUsers.delete(user.key); } else { window.receiptSelectedUsers.add(user.key); } renderReceiptUsers(); };
         container.appendChild(row);
       });
       updateReceiptSelectionChips();
     }
 
-    async function createReceipt(forAll = false) {
-      const title = (document.getElementById('receiptTitle').value || '').trim();
-      if (!title) return alert('Vui lòng nhập tiêu đề biên lai.');
-      const amount = parseInt(document.getElementById('receiptAmount').value);
-      if (isNaN(amount) || amount <= 0) return alert('Vui lòng nhập số tiền biên lai hợp lệ.');
+    window.createReceipt = async function(forAll = false) {
+      const title = (document.getElementById('receiptTitle').value || '').trim(); if (!title) return alert('Vui lòng nhập tiêu đề biên lai.');
+      const amount = parseInt(document.getElementById('receiptAmount').value); if (isNaN(amount) || amount <= 0) return alert('Vui lòng nhập số tiền biên lai hợp lệ.');
       if (amount > 100000000) return alert('Số tiền không vượt quá 100,000,000₫.');
-
-      const note = (document.getElementById('receiptNote').value || '').trim();
-      const selectedIds = Array.from(window.receiptSelectedUsers);
+      const note = (document.getElementById('receiptNote').value || '').trim(); const selectedIds = Array.from(window.receiptSelectedUsers);
       if (!forAll && selectedIds.length === 0) return alert('Hãy chọn tối thiểu một người dùng.');
 
       const receiptId = db.ref('receipts').push().key;
-      const receipt = {
-        title,
-        amount,
-        note,
-        target: forAll ? 'all' : 'selected',
-        users: forAll ? [] : selectedIds,
-        createdAt: Date.now(),
-        createdBy: 'manager',
-        status: 'pending'
-      };
-
+      const receipt = { title, amount, note, target: forAll ? 'all' : 'selected', users: forAll ? [] : selectedIds, createdAt: Date.now(), createdBy: 'manager', status: 'pending' };
       await db.ref(`receipts/${receiptId}`).set(receipt);
       alert('Đã tạo biên lai. Bạn có thể bấm Thông báo để gửi tới user.');
-      if (!forAll) window.receiptSelectedUsers.clear();
-      renderReceiptUsers();
-      renderReceipts();
+      if (!forAll) window.receiptSelectedUsers.clear(); renderReceiptUsers(); renderReceipts();
     }
 
     async function renderReceipts() {
-      const tbody = document.getElementById('receiptTableBody');
-      if (!tbody) return;
-      tbody.innerHTML = '';
-      const snap = await db.ref('receipts').once('value');
-      const receiptMap = new Map();
-      snap.forEach(child => {
-        const key = String(child.key || "").trim();
-        if (!key || receiptMap.has(key)) return;
-        const data = child.val();
-        receiptMap.set(key, { key, ...data });
-      });
+      const tbody = document.getElementById('receiptTableBody'); if (!tbody) return; tbody.innerHTML = '';
+      const snap = await db.ref('receipts').once('value'); const receiptMap = new Map();
+      snap.forEach(child => { const key = String(child.key || "").trim(); if (!key || receiptMap.has(key)) return; const data = child.val(); receiptMap.set(key, { key, ...data }); });
       const rows = Array.from(receiptMap.values());
-      if (!rows.length) {
-        tbody.innerHTML = `<tr><td class="row-empty" colspan="8">Chưa có biên lai nào.</td></tr>`;
-        return;
-      }
-
+      if (!rows.length) { tbody.innerHTML = `<tr><td class="row-empty" colspan="8">Chưa có biên lai nào.</td></tr>`; return; }
       rows.sort((a,b) => b.createdAt - a.createdAt);
       rows.forEach(item => {
-        const tr = document.createElement('tr');
-        const targetLabel = item.target === 'all' ? 'Tất cả' : `${item.users?.length || 0} user`;
-        const time = item.createdAt ? new Date(item.createdAt).toLocaleString() : '-';
-        tr.innerHTML = `
-          <td>${item.key}</td>
-          <td>${item.title || '-'}</td>
-          <td>${item.note || '-'}</td>
-          <td>${targetLabel}</td>
-          <td class="right">${formatCurrency(item.amount)}</td>
-          <td>${item.status || 'pending'}</td>
-          <td>${time}</td>
-          <td class="nowrap">
-            <button class="btn btn-soft btn-notify-receipt" data-id="${item.key}">Thông báo</button>
-            <button class="btn btn-lose btn-delete-receipt" data-id="${item.key}">Xóa</button>
-          </td>
-        `;
+        const tr = document.createElement('tr'); const targetLabel = item.target === 'all' ? 'Tất cả' : `${item.users?.length || 0} user`; const time = item.createdAt ? new Date(item.createdAt).toLocaleString() : '-';
+        tr.innerHTML = `<td>${item.key.substring(1,8)}...</td><td>${item.title || '-'}</td><td>${item.note || '-'}</td><td>${targetLabel}</td><td class="right">${formatCurrency(item.amount)}</td><td>${item.status || 'pending'}</td><td>${time}</td><td class="nowrap"><button class="btn btn-soft btn-notify-receipt" data-id="${item.key}">Thông báo</button> <button class="btn btn-lose btn-delete-receipt" data-id="${item.key}">Xóa</button></td>`;
         tbody.appendChild(tr);
       });
     }
 
-    async function deleteReceipt(receiptId) {
-      if (!confirm('Xóa biên lai này?')) return;
-      await db.ref(`receipts/${receiptId}`).remove();
-      renderReceipts();
-    }
+    window.deleteReceipt = async function(receiptId) { if (!confirm('Xóa biên lai này?')) return; await db.ref(`receipts/${receiptId}`).remove(); renderReceipts(); }
+    async function writeNotificationToUser(userId, payload) { await db.ref(`notifications/${userId}`).push().set(payload); }
+    async function writeNotificationToAll(payload) { await db.ref('notifications_all').push().set(payload); }
 
-    async function writeNotificationToUser(userId, payload) {
-      const ref = db.ref(`notifications/${userId}`).push();
-      await ref.set(payload);
-    }
-
-    async function writeNotificationToAll(payload) {
-      const ref = db.ref('notifications_all').push();
-      await ref.set(payload);
-    }
-
-    async function notifyReceipt(receiptId) {
-      const snap = await db.ref(`receipts/${receiptId}`).once('value');
-      const receipt = snap.val();
+    window.notifyReceipt = async function(receiptId) {
+      const snap = await db.ref(`receipts/${receiptId}`).once('value'); const receipt = snap.val();
       if (!receipt) return alert('Biên lai không tồn tại.');
       const message = `Bạn có biên lai cần trả ${formatCurrency(receipt.amount)}${receipt.note ? ' - ' + receipt.note : ''}`;
       const payload = { type: 'receipt', receiptId, message, createdAt: Date.now() };
-      if (receipt.target === 'all') {
-        await writeNotificationToAll(payload);
-      } else {
-        const users = receipt.users || [];
-        await Promise.all(users.map(uid => writeNotificationToUser(uid, payload)));
-      }
-      await db.ref(`receipts/${receiptId}/notifiedAt`).set(Date.now());
-      alert('Đã gửi thông báo biên lai.');
-      renderReceipts();
+      if (receipt.target === 'all') { await writeNotificationToAll(payload); } else { const users = receipt.users || []; await Promise.all(users.map(uid => writeNotificationToUser(uid, payload))); }
+      await db.ref(`receipts/${receiptId}/notifiedAt`).set(Date.now()); alert('Đã gửi thông báo biên lai.'); renderReceipts();
     }
 
     async function renderLoanReminders() {
-      const tbody = document.getElementById('loanReminderTableBody');
-      if (!tbody) return;
-      tbody.innerHTML = '';
-
+      const tbody = document.getElementById('loanReminderTableBody'); if (!tbody) return; tbody.innerHTML = '';
       const [loanSnap, usersSnap] = await Promise.all([db.ref('loans').once('value'), db.ref('users').once('value')]);
-      const userMap = {};
-      usersSnap.forEach(child => { const val = child.val() || {}; userMap[child.key] = val.username || child.key; });
-
+      const userMap = {}; usersSnap.forEach(child => { const val = child.val() || {}; userMap[child.key] = val.username || child.key; });
       const loanMap = new Map();
-      loanSnap.forEach(child => {
-        const key = String(child.key || "").trim();
-        if (!key || loanMap.has(key)) return;
-        const data = child.val();
-        if (data && data.amount) loanMap.set(key, { userId: key, ...data });
-      });
+      loanSnap.forEach(child => { const key = String(child.key || "").trim(); if (!key || loanMap.has(key)) return; const data = child.val(); if (data && data.amount) loanMap.set(key, { userId: key, ...data }); });
       const rows = Array.from(loanMap.values());
-
-      if (!rows.length) {
-        tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Không có khoản vay nào trong hệ thống.</td></tr>`;
-        return;
-      }
-
+      if (!rows.length) { tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Không có khoản vay nào trong hệ thống.</td></tr>`; return; }
       rows.sort((a,b) => (b.start || 0) - (a.start || 0));
       rows.forEach(item => {
-        const name = userMap[item.userId] || '-';
-        const status = item.status || 'active';
-        const statusLabel = status === 'active' ? 'Đang vay' : status;
-        const time = item.start ? new Date(item.start).toLocaleString() : '-';
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${item.userId}</td>
-          <td>${name}</td>
-          <td class="right">${formatCurrency(item.amount)}</td>
-          <td>${statusLabel}</td>
-          <td>${time}</td>
-          <td class="nowrap">
-            <button class="btn btn-primary btn-notify-loan" data-user="${item.userId}">Nhắc</button>
-          </td>
-        `;
+        const name = userMap[item.userId] || '-'; const status = item.status || 'active'; const statusLabel = status === 'active' ? 'Đang vay' : status; const time = item.start ? new Date(item.start).toLocaleString() : '-';
+        const tr = document.createElement('tr'); tr.innerHTML = `<td>${item.userId}</td><td>${name}</td><td class="right">${formatCurrency(item.amount)}</td><td>${statusLabel}</td><td>${time}</td><td class="nowrap"><button class="btn btn-primary btn-notify-loan" data-user="${item.userId}">Nhắc</button></td>`;
         tbody.appendChild(tr);
       });
     }
 
-    async function notifyLoanReminder(userId) {
-      const snap = await db.ref(`loans/${userId}`).once('value');
-      const loan = snap.val();
+    window.notifyLoanReminder = async function(userId) {
+      const snap = await db.ref(`loans/${userId}`).once('value'); const loan = snap.val();
       if (!loan || !loan.amount) return alert('Không tìm thấy khoản vay của user.');
       const message = `Nhắc nợ: bạn đang vay ${formatCurrency(loan.amount)}. Vui lòng trả sớm để tránh khóa tài khoản.`;
-      await writeNotificationToUser(userId, { type: 'loan_reminder', message, createdAt: Date.now() });
-      alert(`Đã gửi nhắc nợ đến ${userId}.`);
+      await writeNotificationToUser(userId, { type: 'loan_reminder', message, createdAt: Date.now() }); alert(`Đã gửi nhắc nợ đến ${userId}.`);
     }
 
-    async function notifyLoanReminderAll() {
-      const snap = await db.ref('loans').once('value');
-      if (!snap.exists()) return alert('Không có khoản vay nào để nhắc.');
+    window.notifyLoanReminderAll = async function() {
+      const snap = await db.ref('loans').once('value'); if (!snap.exists()) return alert('Không có khoản vay nào để nhắc.');
       const payload = { type: 'loan_reminder_all', message: 'Nhắc nợ: bạn có khoản vay cần xử lý. Vui lòng kiểm tra.', createdAt: Date.now() };
-      await writeNotificationToAll(payload);
-      alert('Đã gửi nhắc nợ cho tất cả user.');
+      await writeNotificationToAll(payload); alert('Đã gửi nhắc nợ cho tất cả user.');
     }
 
-    document.getElementById('receiptTableBody').addEventListener('click', async (e) => {
-      const notifyBtn = e.target.closest('.btn-notify-receipt');
-      const deleteBtn = e.target.closest('.btn-delete-receipt');
-      if (notifyBtn) {
-        await notifyReceipt(notifyBtn.dataset.id);
-      }
-      if (deleteBtn) {
-        await deleteReceipt(deleteBtn.dataset.id);
-      }
-    });
-
-    document.getElementById('loanReminderTableBody').addEventListener('click', async (e) => {
-      const notifyBtn = e.target.closest('.btn-notify-loan');
-      if (notifyBtn) {
-        await notifyLoanReminder(notifyBtn.dataset.user);
-      }
-    });
+    document.getElementById('receiptTableBody').addEventListener('click', async (e) => { const notifyBtn = e.target.closest('.btn-notify-receipt'); const deleteBtn = e.target.closest('.btn-delete-receipt'); if (notifyBtn) await notifyReceipt(notifyBtn.dataset.id); if (deleteBtn) await deleteReceipt(deleteBtn.dataset.id); });
+    document.getElementById('loanReminderTableBody').addEventListener('click', async (e) => { const notifyBtn = e.target.closest('.btn-notify-loan'); if (notifyBtn) await notifyLoanReminder(notifyBtn.dataset.user); });
 
     // ===== Refresh =====
-    function refreshAll() {
-      renderCoinList();
-      renderStockListOnce();
-      renderUsersList();
-      renderReceiptUsers();
-      renderReceipts();
-      renderLoanReminders();
-    }
+    window.refreshAll = function() { renderCoinList(); renderStockListOnce(); renderUsersList(); renderReceiptUsers(); renderReceipts(); renderLoanReminders(); renderMarketplace(); }
 
     // ===== Initial & live =====
-    refreshAll();
+    initIconPicker(); refreshAll();
 
     db.ref("logs").on("value", () => { renderCoinList(); });
     db.ref("logs_stock").on("value", (snap) => { renderStockListFromSnap(snap); });
@@ -1029,3 +1212,4 @@ db.ref("market_stock/status").on("value", snap => {
     db.ref("loans").on("value", () => { renderLoanReminders(); });
   </script>
 </body>
+</html>
