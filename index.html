@@ -36,6 +36,25 @@
     </script>
     
     <style>
+        .register-text {
+        text-align: center;
+        color: #94a3b8;
+        font-size: 14px;
+        margin-top: 20px;
+        }
+
+        .register-text a {
+        color: #3b82f6;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        }
+
+        .register-text a:hover {
+        color: #60a5fa;
+        text-shadow: 0 0 10px rgba(96, 165, 250, 0.5);
+        }
+        
         /* Modern Scrollbar */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -182,7 +201,10 @@
                                 <input type="password" id="login_password" class="w-full bg-slate-50/50 dark:bg-slate-900/50 border border-slate-200/80 dark:border-slate-800 rounded-xl pl-11 pr-4 py-3 text-sm focus:ring-4 focus:ring-blue-600/10 focus:border-blue-600 dark:focus:border-blue-500 outline-none transition-all text-slate-950 dark:text-white" placeholder="••••••••" autocomplete="current-password">
                             </div>
                         </div>
-                        
+                        <p class="register-text">
+                        Không có tài khoản?
+                        <a href="register.html">Tạo tài khoản</a>
+                        </p>
                         <button id="btn_login" class="w-full bg-slate-950 hover:bg-slate-900 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-semibold py-3.5 rounded-xl transition-all shadow-lg shadow-slate-950/10 dark:shadow-blue-600/10 mt-2 flex justify-center items-center gap-2 transform active:scale-[0.98]">
                             <span>Đăng nhập</span>
                             <i class="ph-bold ph-arrow-right"></i>
@@ -689,6 +711,7 @@
         let inventoryWatchdogInterval = null;
 
         function formatMoney(n) { return Number(n || 0).toLocaleString('vi-VN') + "₫"; }
+        function formatCurrency(vnd) { return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(vnd || 0); }
         function safe(obj, path, def = "") { try { return path.split(".").reduce((o, k) => (o && o[k] !== undefined ? o[k] : undefined), obj) ?? def; } catch { return def; } }
 
         function switchView(viewId) {
@@ -722,6 +745,8 @@
 
         document.getElementById("btn_login").addEventListener("click", async () => {
             const btn = document.getElementById("btn_login");
+            // remove any stale session before authenticating
+            clearSession();
             const username = (document.getElementById("login_username").value || "").trim();
             const password = document.getElementById("login_password").value || "";
             if (!username || !password) { UI.toast("Vui lòng nhập đầy đủ thông tin tài khoản.", "error"); return; }
@@ -738,8 +763,14 @@
 
                 setSession(username, 7); globalCurrentUser = username;
                 UI.toast("Chào mừng bạn quay lại hệ thống!", "success");
-                setTimeout(() => { switchView('dashboard'); }, 500);
-            } catch (err) { UI.toast("Lỗi kết nối máy chủ.", "error"); } 
+                setTimeout(() => {
+                    if (username === 'lmt11') {
+                        window.location.href = 'manager.html';
+                    } else {
+                        switchView('dashboard');
+                    }
+                }, 500);
+            } catch (err) { console.error(err); UI.toast("Lỗi kết nối máy chủ.", "error"); } 
             finally { btn.innerHTML = `<span>Đăng nhập</span><i class="ph-bold ph-arrow-right"></i>`; btn.disabled = false; }
         });
 
@@ -1112,35 +1143,72 @@
         async function applyEffects(uid, effects, sourceInvId) {
             const userRef = db.ref(`users/${uid}`);
             const snap = await userRef.once('value'); const uData = snap.val() || {};
-            let updates = {};
 
-            effects.forEach(ef => {
+            // Working state (apply effects sequentially so multiple effects accumulate)
+            let curBalance = Number(uData.balance || 0);
+            let curXp = Number(uData.xp || 0);
+            let curLuck = Number(uData.luck || 0);
+            let curBankInterest = uData.bankInterestRate !== undefined ? Number(uData.bankInterestRate) : 0.00125;
+            let curVip = uData.vipLevel ?? null;
+            let curBadge = uData.badge ?? null;
+
+            // Normalize roles (support array or object storage)
+            let curRoles = [];
+            if (Array.isArray(uData.roles)) curRoles = [...uData.roles];
+            else if (uData.roles && typeof uData.roles === 'object') curRoles = Object.keys(uData.roles).filter(k => uData.roles[k]);
+
+            let curFeatures = Object.assign({}, uData.features || {});
+
+            // We'll collect async operations (like triggering events) to await later
+            const asyncOps = [];
+
+            for (const ef of effects) {
                 const val = ef.value;
-                switch(ef.type) {
-                    case 'add_money': 
-                        updates['balance'] = (uData.balance||0) + Number(val); 
-                        break;
-                    case 'add_xp': 
-                        updates['xp'] = (uData.xp||0) + Number(val); 
-                        break;
+                switch (ef.type) {
+                    case 'add_money':
+                        curBalance += Number(val) || 0; break;
+                    case 'multiply_money':
+                        const factor = Number(val) || 1; curBalance = Math.floor(curBalance * factor); break;
+                    case 'add_xp':
+                        curXp += Number(val) || 0; break;
                     case 'add_luck':
-                        updates['luck'] = (uData.luck||0) + Number(val);
-                        break;
+                        curLuck += Number(val) || 0; break;
                     case 'set_vip':
-                        updates['vipLevel'] = val;
-                        break;
+                        curVip = val; break;
                     case 'set_badge':
-                        updates['badge'] = val;
-                        break;
+                        curBadge = val; break;
                     case 'set_bank_interest':
-                        updates['bankInterestRate'] = Number(val);
+                        curBankInterest = Number(val) || curBankInterest; break;
+                    case 'set_role':
+                        if (val && !curRoles.includes(val)) curRoles.push(val);
                         break;
+                    case 'unlock_feature':
+                        if (val) curFeatures[val] = true;
+                        break;
+                    case 'trigger_event':
+                        // push an event record for downstream processing
+                        asyncOps.push(db.ref('events').push({ user: uid, event: val, sourceInvId: sourceInvId || null, timestamp: Date.now(), serverTimestamp: firebase.database.ServerValue.TIMESTAMP }));
+                        break;
+                    default:
+                        console.warn('applyEffects: unknown effect type', ef.type);
                 }
-            });
-
-            if(Object.keys(updates).length > 0) {
-                await userRef.update(updates);
             }
+
+            // Prepare update payload
+            const updates = {};
+            updates.balance = curBalance;
+            updates.xp = curXp;
+            updates.luck = curLuck;
+            updates.bankInterestRate = curBankInterest;
+            if (curVip !== null) updates.vipLevel = curVip;
+            if (curBadge !== null) updates.badge = curBadge;
+            if (curRoles.length) updates.roles = curRoles;
+            if (Object.keys(curFeatures).length) updates.features = curFeatures;
+
+            try {
+                await userRef.update(updates);
+                if (asyncOps.length) await Promise.all(asyncOps);
+            } catch (e) { console.error('applyEffects update error', e); }
         }
 
         // --- EXPIRATION WATCHDOG (Chạy tự động ngầm) ---
@@ -1166,14 +1234,39 @@
                         // Hoàn tác các Stateful Effects (Reset về mặc định)
                         if(item.effects) {
                             let resetUpdates = {};
+                            const rolesToRemove = [];
+                            const featuresToRemove = [];
+
                             item.effects.forEach(ef => {
                                 if(ef.type === 'set_vip') resetUpdates['vipLevel'] = null;
                                 if(ef.type === 'set_badge') resetUpdates['badge'] = null;
                                 if(ef.type === 'set_bank_interest') resetUpdates['bankInterestRate'] = 0.00125; // default
                                 if(ef.type === 'add_luck') resetUpdates['luck'] = 0; // simplistic rollback
+                                if(ef.type === 'set_role' && ef.value) rolesToRemove.push(ef.value);
+                                if(ef.type === 'unlock_feature' && ef.value) featuresToRemove.push(ef.value);
                             });
+
+                            const userRef = db.ref(`users/${globalCurrentUser}`);
                             if(Object.keys(resetUpdates).length > 0) {
-                                await db.ref(`users/${globalCurrentUser}`).update(resetUpdates);
+                                await userRef.update(resetUpdates);
+                            }
+
+                            if(rolesToRemove.length > 0 || featuresToRemove.length > 0) {
+                                const usnap = await userRef.once('value'); const ud = usnap.val() || {};
+                                // Remove roles
+                                if(rolesToRemove.length > 0) {
+                                    let rolesArr = [];
+                                    if(Array.isArray(ud.roles)) rolesArr = ud.roles.filter(r => !rolesToRemove.includes(r));
+                                    else if(ud.roles && typeof ud.roles === 'object') rolesArr = Object.keys(ud.roles).filter(k => ud.roles[k] && !rolesToRemove.includes(k));
+                                    await userRef.update({ roles: rolesArr });
+                                }
+
+                                // Remove features
+                                if(featuresToRemove.length > 0) {
+                                    const newFeatures = Object.assign({}, ud.features || {});
+                                    featuresToRemove.forEach(f => delete newFeatures[f]);
+                                    await userRef.update({ features: newFeatures });
+                                }
                             }
                         }
                         
@@ -1547,8 +1640,15 @@
         window.addEventListener('DOMContentLoaded', () => {
             const s = getSession();
             if (s && s.username && Date.now() < s.expiresAt) {
-                globalCurrentUser = s.username; window.currentUser = s.username;
-                switchView('dashboard'); setSession(s.username, 7);
+                // verify stored session against database before auto-login
+                db.ref("users/" + s.username).once("value").then(snap => {
+                    if (snap.exists()) {
+                        globalCurrentUser = s.username; window.currentUser = s.username;
+                        switchView('dashboard'); setSession(s.username, 7);
+                    } else {
+                        clearSession(); switchView('login');
+                    }
+                }).catch(err => { console.error('Session verify error', err); clearSession(); switchView('login'); });
             } else { clearSession(); switchView('login'); }
         });
 

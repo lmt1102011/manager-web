@@ -846,10 +846,11 @@
 
     // ===== Render Coin =====
     async function renderCoinList() {
-      const tbody = document.getElementById("coinLogTable");
-      tbody.innerHTML = "";
       try {
         const snap = await db.ref("logs").once("value");
+        const tbody = document.getElementById("coinLogTable");
+        tbody.innerHTML = ""; // Đã sửa lỗi Race Condition ở đây
+
         const rows = [];
         const seen = new Set();
 
@@ -904,7 +905,9 @@
         }
         document.getElementById("coinTotalCount").textContent = aggregateRows.length;
         document.getElementById("coinTotalAmount").textContent = formatCurrency(totalAmount);
-      } catch (err) { tbody.innerHTML = `<tr><td class="row-empty" colspan="3">Lỗi hiển thị: ${String(err)}</td></tr>`; }
+      } catch (err) { 
+        document.getElementById("coinLogTable").innerHTML = `<tr><td class="row-empty" colspan="3">Lỗi hiển thị: ${String(err)}</td></tr>`; 
+      }
     }
 
     document.getElementById("coinLogTable").addEventListener("click", async (e) => {
@@ -953,54 +956,65 @@
 
     // ===== Render Stock =====
     function renderStockListFromSnap(snap) {
-        const tbody = document.getElementById("stockLogTable");
-        tbody.innerHTML = "";
         try {
-            const rows = []; const seen = new Set(); const data = snap.val() || {};
-            for (const rawKey in data) {
-                if (!Object.prototype.hasOwnProperty.call(data, rawKey)) continue;
-                const key = String(rawKey || "").trim(); if (!key || seen.has(key)) continue;
-                seen.add(key); rows.push({ key, ...data[rawKey] });
+            const data = snap.val() || {};
+            const rows = [];
+            
+            // Chuyển object data sang mảng rows
+            for (const key in data) {
+                if (Object.prototype.hasOwnProperty.call(data, key)) {
+                    rows.push({ key, ...data[key] });
+                }
             }
 
-            const grouped = new Map();
-            rows.forEach(log => {
-                const rawUsername = String(safe(log, "username", "-"))?.trim(); const usernameKey = normalizeKey(rawUsername);
-                const amount = Number(safe(log, "amount", 0)); const timestamp = Number(log.timestamp || 0);
-                if (!grouped.has(usernameKey)) { grouped.set(usernameKey, { ...log, username: rawUsername, amount, timestamp, count: 1 }); } 
-                else {
-                    const existing = grouped.get(usernameKey); existing.amount += amount; existing.count += 1;
-                    if (timestamp > (existing.timestamp || 0)) { existing.timestamp = timestamp; existing.key = log.key; existing.winRate = log.winRate; existing.finalBar = log.finalBar; existing.result = log.result; }
-                }
-            });
+            // Sắp xếp lệnh theo thời gian mới nhất
+            rows.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-            const aggregateRows = Array.from(grouped.values());
-            function getTimeSafe(log) { try { return new Date(log.timestamp).getTime() || 0; } catch { return 0; } }
-            aggregateRows.sort((a, b) => getTimeSafe(b) - getTimeSafe(a));
+            const tbody = document.getElementById("stockLogTable");
+            tbody.innerHTML = ""; // Xóa dữ liệu cũ ngay trước khi chèn để chống trùng
 
             let totalAmount = 0;
-            if (aggregateRows.length === 0) { tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Không có lệnh nào.</td></tr>`; } 
-            else {
-                tbody.innerHTML = "";
-                aggregateRows.forEach(log => {
-                    const username = safe(log, "username", "-"); const amount = Number(safe(log, "amount", 0));
-                    const winRate = safe(log, "winRate", "-"); const finalBar = safe(log, "finalBar", "-"); const result = safe(log, "result", "-");
-                    let ts = "-"; try { ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : "-"; } catch {}
+            if (rows.length === 0) { 
+                tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Không có lệnh nào.</td></tr>`; 
+            } else {
+                // Hiển thị trực tiếp từng lệnh riêng biệt, không gộp theo User nữa
+                rows.forEach(log => {
+                    const username = log.username || "-";
+                    const amount = Number(log.amount || 0);
+                    const winRate = log.winRate !== undefined ? log.winRate : "-";
+                    const finalBar = log.finalBar !== undefined ? log.finalBar : "-";
+                    const result = log.result || "-";
+                    let ts = "-"; 
+                    try { ts = log.timestamp ? new Date(log.timestamp).toLocaleString() : "-"; } catch {}
+                    
                     totalAmount += amount || 0;
+                    
                     const tr = document.createElement("tr");
-                    tr.innerHTML = `<td>${username}</td><td class="right">${formatCurrency(amount)}</td><td>${winRate === "-" ? "-" : (winRate + "%")}</td><td>${finalBar}</td><td>${result}</td><td>${ts}</td>`;
+                    tr.innerHTML = `
+                        <td>${username}</td>
+                        <td class="right">${formatCurrency(amount)}</td>
+                        <td>${winRate === "-" ? "-" : (winRate + "%")}</td>
+                        <td>${finalBar}</td>
+                        <td>${result}</td>
+                        <td>${ts}</td>
+                    `;
                     tbody.appendChild(tr);
                 });
             }
-            document.getElementById("stockTotalCount").textContent = aggregateRows.length;
+            document.getElementById("stockTotalCount").textContent = rows.length;
             document.getElementById("stockTotalAmount").textContent = formatCurrency(totalAmount);
-        } catch (err) { tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Lỗi hiển thị: ${String(err)}</td></tr>`; }
+        } catch (err) { 
+            document.getElementById("stockLogTable").innerHTML = `<tr><td class="row-empty" colspan="6">Lỗi hiển thị: ${String(err)}</td></tr>`; 
+        }
     }
 
     async function renderStockListOnce() {
-      const tbody = document.getElementById("stockLogTable"); tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Đang tải...</td></tr>`;
-      try { const snap = await db.ref("logs_stock").once("value"); renderStockListFromSnap(snap); } 
-      catch (err) { tbody.innerHTML = `<tr><td class="row-empty" colspan="6">Lỗi đọc dữ liệu: ${String(err)}</td></tr>`; }
+      try { 
+        const snap = await db.ref("logs_stock").once("value"); 
+        renderStockListFromSnap(snap); 
+      } catch (err) { 
+        document.getElementById("stockLogTable").innerHTML = `<tr><td class="row-empty" colspan="6">Lỗi đọc dữ liệu: ${String(err)}</td></tr>`; 
+      }
     }
 
     async function resetStockTotal() {
@@ -1019,11 +1033,14 @@
 
     // ===== Users =====
     async function renderUsersList() {
-      const tbody = document.getElementById("usersTableBody");
       const search = (document.getElementById("userSearch").value || "").trim().toLowerCase();
-      tbody.innerHTML = "";
       try {
-        const snap = await db.ref("users").once("value"); const usersMap = new Map();
+        const snap = await db.ref("users").once("value"); 
+        
+        const tbody = document.getElementById("usersTableBody");
+        tbody.innerHTML = ""; // Làm trống table SAU KHI await xong để tránh Race Condition
+
+        const usersMap = new Map();
         snap.forEach(child => {
           const key = String(child.key || "").trim(); if (!key || usersMap.has(key)) return;
           const val = child.val() || {}; const name = String(val.username || key).trim(); const balance = Number(val.balance || 0);
@@ -1047,7 +1064,9 @@
             </td>`;
           tbody.appendChild(tr);
         });
-      } catch (err) { tbody.innerHTML = `<tr><td class="row-empty" colspan="5">Lỗi hiển thị: ${String(err)}</td></tr>`; }
+      } catch (err) { 
+        document.getElementById("usersTableBody").innerHTML = `<tr><td class="row-empty" colspan="5">Lỗi hiển thị: ${String(err)}</td></tr>`; 
+      }
     }
 
     async function deleteUserAndData(userKey) {
@@ -1104,16 +1123,20 @@
     }
 
     async function renderReceiptUsers() {
-      const container = document.getElementById('receiptUserList'); if (!container) return;
       const search = (document.getElementById('receiptUserSearch')?.value || '').trim().toLowerCase();
-      const snap = await db.ref('users').once('value'); const usersMap = new Map();
+      const snap = await db.ref('users').once('value'); 
+      
+      const container = document.getElementById('receiptUserList'); if (!container) return;
+      container.innerHTML = ''; // Đã sửa lỗi Race Condition ở đây
+
+      const usersMap = new Map();
       snap.forEach(child => {
         const key = String(child.key || "").trim(); if (!key || usersMap.has(key)) return;
         const val = child.val() || {}; const name = String(val.username || key).trim();
         if (search && !(`${name} ${key}`.toLowerCase().includes(search))) return;
         usersMap.set(key, { key, name });
       });
-      const users = Array.from(usersMap.values()); container.innerHTML = '';
+      const users = Array.from(usersMap.values()); 
       if (!users.length) { container.innerHTML = '<div class="row-empty" style="padding:12px;">Không tìm thấy người dùng.</div>'; updateReceiptSelectionChips(); return; }
       users.sort((a,b) => a.name.localeCompare(b.name));
       users.forEach(user => {
@@ -1141,8 +1164,11 @@
     }
 
     async function renderReceipts() {
-      const tbody = document.getElementById('receiptTableBody'); if (!tbody) return; tbody.innerHTML = '';
-      const snap = await db.ref('receipts').once('value'); const receiptMap = new Map();
+      const snap = await db.ref('receipts').once('value'); 
+      const tbody = document.getElementById('receiptTableBody'); if (!tbody) return; 
+      tbody.innerHTML = ''; // Đã sửa lỗi Race Condition ở đây
+
+      const receiptMap = new Map();
       snap.forEach(child => { const key = String(child.key || "").trim(); if (!key || receiptMap.has(key)) return; const data = child.val(); receiptMap.set(key, { key, ...data }); });
       const rows = Array.from(receiptMap.values());
       if (!rows.length) { tbody.innerHTML = `<tr><td class="row-empty" colspan="8">Chưa có biên lai nào.</td></tr>`; return; }
@@ -1168,8 +1194,11 @@
     }
 
     async function renderLoanReminders() {
-      const tbody = document.getElementById('loanReminderTableBody'); if (!tbody) return; tbody.innerHTML = '';
       const [loanSnap, usersSnap] = await Promise.all([db.ref('loans').once('value'), db.ref('users').once('value')]);
+      
+      const tbody = document.getElementById('loanReminderTableBody'); if (!tbody) return; 
+      tbody.innerHTML = ''; // Đã sửa lỗi Race Condition ở đây
+
       const userMap = {}; usersSnap.forEach(child => { const val = child.val() || {}; userMap[child.key] = val.username || child.key; });
       const loanMap = new Map();
       loanSnap.forEach(child => { const key = String(child.key || "").trim(); if (!key || loanMap.has(key)) return; const data = child.val(); if (data && data.amount) loanMap.set(key, { userId: key, ...data }); });
